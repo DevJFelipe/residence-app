@@ -120,7 +120,7 @@ class DashboardScreen extends StatelessWidget {
                   const SizedBox(height: 32),
                   const CollectionsChart(),
                   const SizedBox(height: 32),
-                  _buildQuickActionsAndFeed(),
+                  _buildQuickActionsAndFeed(context),
                   const SizedBox(height: 32),
                   const VisitorsTable(),
                 ],
@@ -176,32 +176,84 @@ class DashboardScreen extends StatelessWidget {
               Row(
                 children: [
                   // Bell with notification dot
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: SizedBox(
-                      width: 16,
-                      height: 20,
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          SvgPicture.asset(
-                            'assets/icons/bell.svg',
-                            width: 16,
-                            height: 20,
+                  GestureDetector(
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        backgroundColor: Colors.transparent,
+                        builder: (ctx) => Container(
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(24),
+                              topRight: Radius.circular(24),
+                            ),
                           ),
-                          Positioned(
-                            top: 0,
-                            right: -2,
-                            child: Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: AppColors.primary,
-                                shape: BoxShape.circle,
+                          child: SafeArea(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 40, height: 4,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.divider,
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text('Notificaciones', style: AppTextStyles.heading3),
+                                  const SizedBox(height: 16),
+                                  ListTile(
+                                    leading: const Icon(Icons.payment, color: AppColors.primary),
+                                    title: const Text('Pago recibido - Apto 402'),
+                                    subtitle: const Text('Hace 15 min'),
+                                  ),
+                                  ListTile(
+                                    leading: const Icon(Icons.person, color: AppColors.primary),
+                                    title: const Text('Visitante registrado - Torre B'),
+                                    subtitle: const Text('Hace 45 min'),
+                                  ),
+                                  ListTile(
+                                    leading: const Icon(Icons.report_problem, color: AppColors.primary),
+                                    title: const Text('Nueva PQRS - Daño Ascensor'),
+                                    subtitle: const Text('Hace 2 horas'),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
-                        ],
+                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: SizedBox(
+                        width: 16,
+                        height: 20,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            SvgPicture.asset(
+                              'assets/icons/bell.svg',
+                              width: 16,
+                              height: 20,
+                            ),
+                            Positioned(
+                              top: 0,
+                              right: -2,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.primary,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -214,18 +266,85 @@ class DashboardScreen extends StatelessWidget {
                   ),
                   const SizedBox(width: 16),
                   // Orange button with plus
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: SvgPicture.asset(
-                      'assets/icons/plus.svg',
-                      width: 10.5,
-                      height: 10.5,
-                      colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                  GestureDetector(
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        backgroundColor: Colors.transparent,
+                        builder: (ctx) => Container(
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(24),
+                              topRight: Radius.circular(24),
+                            ),
+                          ),
+                          child: SafeArea(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 40, height: 4,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.divider,
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text('Acciones Rápidas', style: AppTextStyles.heading3),
+                                  const SizedBox(height: 16),
+                                  ListTile(
+                                    leading: const Icon(Icons.person_add, color: AppColors.primary),
+                                    title: const Text('Agregar Residente'),
+                                    onTap: () {
+                                      Navigator.of(ctx).pop();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Próximamente: Agregar Residente')),
+                                      );
+                                    },
+                                  ),
+                                  ListTile(
+                                    leading: const Icon(Icons.badge, color: AppColors.primary),
+                                    title: const Text('Registrar Visitante'),
+                                    onTap: () {
+                                      Navigator.of(ctx).pop();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Próximamente: Registrar Visitante')),
+                                      );
+                                    },
+                                  ),
+                                  ListTile(
+                                    leading: const Icon(Icons.campaign, color: AppColors.primary),
+                                    title: const Text('Enviar Anuncio'),
+                                    onTap: () {
+                                      Navigator.of(ctx).pop();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Próximamente: Enviar Anuncio')),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: SvgPicture.asset(
+                        'assets/icons/plus.svg',
+                        width: 10.5,
+                        height: 10.5,
+                        colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                      ),
                     ),
                   ),
                 ],
@@ -296,17 +415,17 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickActionsAndFeed() {
+  Widget _buildQuickActionsAndFeed(BuildContext context) {
     return Column(
       children: [
-        _buildQuickActions(),
+        _buildQuickActions(context),
         const SizedBox(height: 32),
-        _buildRecentActivity(),
+        _buildRecentActivity(context),
       ],
     );
   }
 
-  Widget _buildQuickActions() {
+  Widget _buildQuickActions(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(25),
       decoration: BoxDecoration(
@@ -340,6 +459,11 @@ class DashboardScreen extends StatelessWidget {
                 iconHeight: 20,
                 label: 'Agregar\nResidente',
                 isPrimary: true,
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Próximamente: Agregar Residente')),
+                  );
+                },
               ),
               QuickActionButton(
                 iconAsset: 'assets/icons/action_register_visitor.svg',
@@ -347,18 +471,33 @@ class DashboardScreen extends StatelessWidget {
                 iconHeight: 25,
                 label: 'Registrar\nVisitante',
                 isPrimary: true,
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Próximamente: Registrar Visitante')),
+                  );
+                },
               ),
               QuickActionButton(
                 iconAsset: 'assets/icons/action_announcement.svg',
                 iconWidth: 25,
                 iconHeight: 20,
                 label: 'Enviar Anuncio',
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Próximamente: Enviar Anuncio')),
+                  );
+                },
               ),
               QuickActionButton(
                 iconAsset: 'assets/icons/action_billing.svg',
                 iconWidth: 22.5,
                 iconHeight: 25,
                 label: 'Generar Cobros',
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Próximamente: Generar Cobros')),
+                  );
+                },
               ),
             ],
           ),
@@ -367,7 +506,7 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRecentActivity() {
+  Widget _buildRecentActivity(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(25),
       decoration: BoxDecoration(
@@ -413,11 +552,18 @@ class DashboardScreen extends StatelessWidget {
           const SizedBox(height: 16),
           // "Ver todo el historial" button
           Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'Ver todo el historial',
-                style: AppTextStyles.bold14.copyWith(color: AppColors.primary),
+            child: GestureDetector(
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Próximamente')),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'Ver todo el historial',
+                  style: AppTextStyles.bold14.copyWith(color: AppColors.primary),
+                ),
               ),
             ),
           ),

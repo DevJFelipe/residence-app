@@ -85,18 +85,9 @@ class _BillingScreenState extends State<BillingScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Left: Back + title
+              // Left: Title
               Row(
                 children: [
-                  GestureDetector(
-                    onTap: () {},
-                    child: SvgPicture.asset(
-                      'assets/icons/billing_back.svg',
-                      width: 20,
-                      height: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,

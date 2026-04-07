@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_colors.dart';
+import '../login/login_screen.dart';
+import 'visitor_preregister_screen.dart';
 
 class CondoProfileScreen extends StatelessWidget {
   const CondoProfileScreen({super.key});
@@ -70,13 +72,27 @@ class CondoProfileScreen extends StatelessWidget {
                     fontSize: 18, fontWeight: FontWeight.w700, height: 28/18, letterSpacing: -0.45, color: _dark,
                   )),
                   Row(children: [
-                    SizedBox(width: 40, height: 40, child: Center(
-                      child: SvgPicture.asset('assets/icons/prof_share.svg', width: 18, height: 20),
-                    )),
+                    GestureDetector(
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Compartir')),
+                        );
+                      },
+                      child: SizedBox(width: 40, height: 40, child: Center(
+                        child: SvgPicture.asset('assets/icons/prof_share.svg', width: 18, height: 20),
+                      )),
+                    ),
                     const SizedBox(width: 8),
-                    SizedBox(width: 40, height: 40, child: Center(
-                      child: SvgPicture.asset('assets/icons/prof_heart.svg', width: 20, height: 18.35),
-                    )),
+                    GestureDetector(
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Añadido a favoritos')),
+                        );
+                      },
+                      child: SizedBox(width: 40, height: 40, child: Center(
+                        child: SvgPicture.asset('assets/icons/prof_heart.svg', width: 20, height: 18.35),
+                      )),
+                    ),
                   ]),
                 ],
               ),
@@ -260,10 +276,19 @@ class CondoProfileScreen extends StatelessWidget {
           },
         ),
         const SizedBox(height: 16),
-        Center(child: Text('Mostrar las 12 amenidades', style: GoogleFonts.publicSans(
-          fontSize: 14, fontWeight: FontWeight.w700, height: 20/14, color: AppColors.primary,
-          decoration: TextDecoration.underline, decorationColor: AppColors.primary,
-        ))),
+        Center(child: Builder(
+          builder: (context) => GestureDetector(
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Próximamente')),
+              );
+            },
+            child: Text('Mostrar las 12 amenidades', style: GoogleFonts.publicSans(
+              fontSize: 14, fontWeight: FontWeight.w700, height: 20/14, color: AppColors.primary,
+              decoration: TextDecoration.underline, decorationColor: AppColors.primary,
+            )),
+          ),
+        )),
       ]),
     );
   }
@@ -381,33 +406,43 @@ class CondoProfileScreen extends StatelessWidget {
         ),
         child: Column(children: [
           // Soy residente
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(12)),
-            child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text('Soy residente', style: GoogleFonts.publicSans(fontSize: 16, fontWeight: FontWeight.w700, height: 24/16, color: Colors.white)),
-              Row(children: [
-                Text('Iniciar sesión', style: GoogleFonts.publicSans(fontSize: 14, fontWeight: FontWeight.w700, height: 20/14, color: Colors.white)),
-                const SizedBox(width: 4),
-                SvgPicture.asset('assets/icons/prof_arrow.svg', width: 16, height: 16),
+          GestureDetector(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(12)),
+              child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                Text('Soy residente', style: GoogleFonts.publicSans(fontSize: 16, fontWeight: FontWeight.w700, height: 24/16, color: Colors.white)),
+                Row(children: [
+                  Text('Iniciar sesión', style: GoogleFonts.publicSans(fontSize: 14, fontWeight: FontWeight.w700, height: 20/14, color: Colors.white)),
+                  const SizedBox(width: 4),
+                  SvgPicture.asset('assets/icons/prof_arrow.svg', width: 16, height: 16),
+                ]),
               ]),
-            ]),
+            ),
           ),
           const SizedBox(height: 8),
           // Voy a visitar
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0x1AEC5B13), borderRadius: BorderRadius.circular(12),
+          GestureDetector(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const VisitorPreregisterScreen()),
             ),
-            child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text('Voy a visitar', style: GoogleFonts.publicSans(fontSize: 16, fontWeight: FontWeight.w700, height: 24/16, color: AppColors.primary)),
-              Row(children: [
-                Text('Pre-registrarme', style: GoogleFonts.publicSans(fontSize: 14, fontWeight: FontWeight.w500, height: 20/14, color: AppColors.primary)),
-                const SizedBox(width: 4),
-                SvgPicture.asset('assets/icons/prof_qr.svg', width: 18, height: 18),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0x1AEC5B13), borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                Text('Voy a visitar', style: GoogleFonts.publicSans(fontSize: 16, fontWeight: FontWeight.w700, height: 24/16, color: AppColors.primary)),
+                Row(children: [
+                  Text('Pre-registrarme', style: GoogleFonts.publicSans(fontSize: 14, fontWeight: FontWeight.w500, height: 20/14, color: AppColors.primary)),
+                  const SizedBox(width: 4),
+                  SvgPicture.asset('assets/icons/prof_qr.svg', width: 18, height: 18),
+                ]),
               ]),
-            ]),
+            ),
           ),
         ]),
       ),

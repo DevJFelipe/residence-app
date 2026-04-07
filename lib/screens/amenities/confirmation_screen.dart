@@ -280,28 +280,35 @@ class ConfirmationScreen extends StatelessWidget {
       child: Column(
         children: [
           // Download button
-          Container(
-            width: double.infinity,
-            height: 56,
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: const [
-                BoxShadow(color: Color(0x1A000000), blurRadius: 15, offset: Offset(0, 10), spreadRadius: -3),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SvgPicture.asset('assets/icons/confirm_download.svg', width: 16, height: 16),
-                const SizedBox(width: 8),
-                Text(
-                  'Descargar Comprobante',
-                  style: GoogleFonts.dmSans(
-                    fontSize: 16, fontWeight: FontWeight.w700, height: 24 / 16, color: Colors.white,
+          GestureDetector(
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Comprobante descargado')),
+              );
+            },
+            child: Container(
+              width: double.infinity,
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x1A000000), blurRadius: 15, offset: Offset(0, 10), spreadRadius: -3),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SvgPicture.asset('assets/icons/confirm_download.svg', width: 16, height: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Descargar Comprobante',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 16, fontWeight: FontWeight.w700, height: 24 / 16, color: Colors.white,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 12),

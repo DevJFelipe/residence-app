@@ -100,14 +100,14 @@ class ActiveVisitorsSection extends StatelessWidget {
           final visitor = _visitors[index];
           return Padding(
             padding: EdgeInsets.only(bottom: index < _visitors.length - 1 ? 16 : 0),
-            child: _buildVisitorCard(visitor),
+            child: _buildVisitorCard(context, visitor),
           );
         }),
       ],
     );
   }
 
-  Widget _buildVisitorCard(_VisitorData visitor) {
+  Widget _buildVisitorCard(BuildContext context, _VisitorData visitor) {
     return Container(
       height: 74,
       padding: const EdgeInsets.all(17),
@@ -165,16 +165,23 @@ class ActiveVisitorsSection extends StatelessWidget {
             ],
           ),
           // SALIDA button
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0x33EC5B13)),
-            ),
-            child: Text(
-              'SALIDA',
-              style: AppTextStyles.bold12.copyWith(
-                color: AppColors.primary,
+          GestureDetector(
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Salida registrada')),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0x33EC5B13)),
+              ),
+              child: Text(
+                'SALIDA',
+                style: AppTextStyles.bold12.copyWith(
+                  color: AppColors.primary,
+                ),
               ),
             ),
           ),

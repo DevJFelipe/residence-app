@@ -268,21 +268,99 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
                   ),
                   const SizedBox(height: 16),
                   // Button
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isFinished ? 17 : 16,
-                      vertical: isFinished ? 9 : 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isFinished ? null : _dark,
-                      borderRadius: BorderRadius.circular(8),
-                      border: isFinished ? Border.all(color: _dark) : null,
-                    ),
-                    child: Text(
-                      'VER DETALLES',
-                      style: GoogleFonts.dmSans(
-                        fontSize: 12, fontWeight: FontWeight.w700, height: 16 / 12,
-                        letterSpacing: 0.6, color: isFinished ? _dark : Colors.white,
+                  GestureDetector(
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        backgroundColor: Colors.transparent,
+                        builder: (ctx) => Container(
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(24),
+                              topRight: Radius.circular(24),
+                            ),
+                          ),
+                          child: SafeArea(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 40, height: 4,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE2E8F0),
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    reservation.title,
+                                    style: GoogleFonts.cormorantGaramond(
+                                      fontSize: 24, fontWeight: FontWeight.w700, height: 32 / 24, color: _dark,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.calendar_today, size: 16, color: Color(0xFF64748B)),
+                                      const SizedBox(width: 8),
+                                      Text('Fecha: ${reservation.date}', style: GoogleFonts.dmSans(fontSize: 14, color: const Color(0xFF64748B))),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.access_time, size: 16, color: Color(0xFF64748B)),
+                                      const SizedBox(width: 8),
+                                      Text('Horario: ${reservation.time}', style: GoogleFonts.dmSans(fontSize: 14, color: const Color(0xFF64748B))),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.info_outline, size: 16, color: Color(0xFF64748B)),
+                                      const SizedBox(width: 8),
+                                      Text('Estado: ${reservation.status.name.toUpperCase()}', style: GoogleFonts.dmSans(fontSize: 14, color: const Color(0xFF64748B))),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 24),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      onPressed: () => Navigator.of(ctx).pop(),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: _dark,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      ),
+                                      child: const Text('Cerrar'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isFinished ? 17 : 16,
+                        vertical: isFinished ? 9 : 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isFinished ? null : _dark,
+                        borderRadius: BorderRadius.circular(8),
+                        border: isFinished ? Border.all(color: _dark) : null,
+                      ),
+                      child: Text(
+                        'VER DETALLES',
+                        style: GoogleFonts.dmSans(
+                          fontSize: 12, fontWeight: FontWeight.w700, height: 16 / 12,
+                          letterSpacing: 0.6, color: isFinished ? _dark : Colors.white,
+                        ),
                       ),
                     ),
                   ),

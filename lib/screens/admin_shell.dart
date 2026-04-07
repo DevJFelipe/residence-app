@@ -4,6 +4,8 @@ import 'dashboard/dashboard_screen.dart';
 import 'visitors/visitors_screen.dart';
 import 'billing/billing_screen.dart';
 import 'dashboard/widgets/bottom_nav_bar.dart';
+import 'package:residence_app/ui/screens/admin/pqrs/pqrs_screen.dart';
+import 'package:residence_app/ui/screens/admin/more/more_screen.dart';
 
 class AdminShell extends StatefulWidget {
   const AdminShell({super.key});
@@ -25,8 +27,8 @@ class _AdminShellState extends State<AdminShell> {
           DashboardScreen(),
           VisitorsScreen(),
           BillingScreen(),
-          _PlaceholderScreen(title: 'PQRS'),
-          _PlaceholderScreen(title: 'Más'),
+          PqrsScreen(),
+          MoreScreen(),
         ],
       ),
       bottomNavigationBar: AppBottomNavBar(
@@ -41,21 +43,3 @@ class _AdminShellState extends State<AdminShell> {
   }
 }
 
-class _PlaceholderScreen extends StatelessWidget {
-  final String title;
-  const _PlaceholderScreen({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-          color: AppColors.textSecondary,
-        ),
-      ),
-    );
-  }
-}
