@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
+import '../../../models/dashboard_models.dart';
 
 class VisitorsTable extends StatelessWidget {
-  const VisitorsTable({super.key});
+  final List<ActiveVisitor> visitors;
+
+  const VisitorsTable({super.key, required this.visitors});
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +47,7 @@ class VisitorsTable extends StatelessWidget {
                     borderRadius: BorderRadius.circular(9999),
                   ),
                   child: Text(
-                    '8 Activos',
+                    '${visitors.length} Activos',
                     style:
                         AppTextStyles.bold12.copyWith(color: AppColors.primary),
                   ),
@@ -52,52 +55,54 @@ class VisitorsTable extends StatelessWidget {
               ],
             ),
           ),
-          // Table
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SizedBox(
-              width: 572,
-              child: Column(
-                children: [
-                  // Table header
-                  Container(
-                    color: AppColors.surfaceLight,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 16),
-                    child: Row(
-                      children: [
-                        _headerCell('NOMBRE', flex: 3),
-                        _headerCell('DESTINO', flex: 2),
-                        _headerCell('ENTRADA', flex: 2),
-                        _headerCell('TIPO', flex: 2),
-                        _headerCell('ACCIÓN', flex: 2),
-                      ],
+          if (visitors.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(32),
+              child: Center(
+                child: Text(
+                  'No hay visitantes en sitio',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            )
+          else
+            // Table
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: 572,
+                child: Column(
+                  children: [
+                    // Table header
+                    Container(
+                      color: AppColors.surfaceLight,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 16),
+                      child: Row(
+                        children: [
+                          _headerCell('NOMBRE', flex: 3),
+                          _headerCell('DESTINO', flex: 2),
+                          _headerCell('ENTRADA', flex: 2),
+                          _headerCell('TIPO', flex: 2),
+                          _headerCell('ACCIÓN', flex: 2),
+                        ],
+                      ),
                     ),
-                  ),
-                  // Row 1
-                  _buildVisitorRow(
-                    name: 'Carlos\nRuiz',
-                    destination: 'Apto\n501-A',
-                    time: '02:45\nPM',
-                    type: 'DOMICILIO',
-                    typeBg: AppColors.badgeDomicilio,
-                    typeColor: AppColors.badgeDomicilioText,
-                    showBorder: false,
-                  ),
-                  // Row 2
-                  _buildVisitorRow(
-                    name: 'Ana\nMartínez',
-                    destination: 'Apto\n203-B',
-                    time: '03:12\nPM',
-                    type: 'FAMILIAR',
-                    typeBg: AppColors.badgeFamiliar,
-                    typeColor: AppColors.badgeFamiliarText,
-                    showBorder: true,
-                  ),
-                ],
+                    // Rows
+                    ...visitors.asMap().entries.map((entry) {
+                      final visitor = entry.value;
+                      final isFirst = entry.key == 0;
+                      return _buildVisitorRow(
+                        visitor: visitor,
+                        showBorder: !isFirst,
+                      );
+                    }),
+                  ],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -115,15 +120,36 @@ class VisitorsTable extends StatelessWidget {
     );
   }
 
+  Color _typeBg(String type) {
+    final t = type.toUpperCase();
+    if (t.contains('FAMILIAR') || t.contains('VISITANTE')) {
+      return AppColors.badgeFamiliar;
+    }
+    return AppColors.badgeDomicilio;
+  }
+
+  Color _typeColor(String type) {
+    final t = type.toUpperCase();
+    if (t.contains('FAMILIAR') || t.contains('VISITANTE')) {
+      return AppColors.badgeFamiliarText;
+    }
+    return AppColors.badgeDomicilioText;
+  }
+
+  String _formatTime(DateTime? dt) {
+    if (dt == null) return '--';
+    final local = dt.toLocal();
+    final hour = local.hour > 12 ? local.hour - 12 : (local.hour == 0 ? 12 : local.hour);
+    final minute = local.minute.toString().padLeft(2, '0');
+    final period = local.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:$minute\n$period';
+  }
+
   Widget _buildVisitorRow({
-    required String name,
-    required String destination,
-    required String time,
-    required String type,
-    required Color typeBg,
-    required Color typeColor,
+    required ActiveVisitor visitor,
     required bool showBorder,
   }) {
+    final type = visitor.typeLabel.toUpperCase();
     return Container(
       decoration: showBorder
           ? const BoxDecoration(
@@ -151,7 +177,7 @@ class VisitorsTable extends StatelessWidget {
                 const SizedBox(width: 12),
                 Flexible(
                   child: Text(
-                    name,
+                    visitor.visitorName,
                     style: AppTextStyles.medium14,
                   ),
                 ),
@@ -162,7 +188,7 @@ class VisitorsTable extends StatelessWidget {
           Expanded(
             flex: 2,
             child: Text(
-              destination,
+              visitor.propertyNumber ?? '--',
               style: AppTextStyles.bodyMedium,
             ),
           ),
@@ -170,7 +196,7 @@ class VisitorsTable extends StatelessWidget {
           Expanded(
             flex: 2,
             child: Text(
-              time,
+              _formatTime(visitor.entryTime),
               style: AppTextStyles.bodyMedium.copyWith(
                 color: AppColors.textSecondary,
               ),
@@ -185,12 +211,12 @@ class VisitorsTable extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: typeBg,
+                  color: _typeBg(type),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   type,
-                  style: AppTextStyles.bold10.copyWith(color: typeColor),
+                  style: AppTextStyles.bold10.copyWith(color: _typeColor(type)),
                 ),
               ),
             ),

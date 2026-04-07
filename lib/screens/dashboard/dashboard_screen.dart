@@ -3,6 +3,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../../core/session_manager.dart';
+import '../../services/dashboard_service.dart';
+import '../../models/dashboard_models.dart';
 import '../login/login_screen.dart';
 import 'widgets/stat_card.dart';
 import 'widgets/collections_chart.dart';
@@ -10,8 +13,45 @@ import 'widgets/quick_action_button.dart';
 import 'widgets/activity_item.dart';
 import 'widgets/visitors_table.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  final _dashboardService = DashboardService();
+  DashboardSummary? _summary;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboard();
+  }
+
+  Future<void> _loadDashboard() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final summary = await _dashboardService.getSummary();
+      if (!mounted) return;
+      setState(() {
+        _summary = summary;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'No se pudo cargar el dashboard';
+        _loading = false;
+      });
+    }
+  }
 
   void _showMenu(BuildContext context) {
     showModalBottomSheet(
@@ -86,8 +126,10 @@ class DashboardScreen extends StatelessWidget {
                     fontSize: 15, fontWeight: FontWeight.w600,
                     color: const Color(0xFFEF4444),
                   )),
-                  onTap: () {
+                  onTap: () async {
                     Navigator.of(ctx).pop(); // close sheet
+                    await SessionManager().clear();
+                    if (!context.mounted) return;
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(builder: (_) => const LoginScreen()),
                       (route) => false,
@@ -108,27 +150,53 @@ class DashboardScreen extends StatelessWidget {
       children: [
         _buildHeader(context),
         Expanded(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildWelcomeSection(),
-                  const SizedBox(height: 32),
-                  _buildStatsCards(),
-                  const SizedBox(height: 32),
-                  const CollectionsChart(),
-                  const SizedBox(height: 32),
-                  _buildQuickActionsAndFeed(context),
-                  const SizedBox(height: 32),
-                  const VisitorsTable(),
-                ],
-              ),
-            ),
-          ),
+          child: _loading
+              ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+              : _error != null
+                  ? _buildError()
+                  : RefreshIndicator(
+                      onRefresh: _loadDashboard,
+                      color: AppColors.primary,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildWelcomeSection(),
+                              const SizedBox(height: 32),
+                              _buildStatsCards(),
+                              const SizedBox(height: 32),
+                              const CollectionsChart(),
+                              const SizedBox(height: 32),
+                              _buildQuickActionsAndFeed(),
+                              const SizedBox(height: 32),
+                              VisitorsTable(visitors: _summary!.activeVisitors),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
         ),
       ],
+    );
+  }
+
+  Widget _buildError() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(_error!, style: AppTextStyles.bodyLarge),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _loadDashboard,
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('Reintentar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -175,176 +243,54 @@ class DashboardScreen extends StatelessWidget {
               // Right: Bell + Divider + Button
               Row(
                 children: [
-                  // Bell with notification dot
-                  GestureDetector(
-                    onTap: () {
-                      showModalBottomSheet(
-                        context: context,
-                        backgroundColor: Colors.transparent,
-                        builder: (ctx) => Container(
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.only(
-                              topLeft: Radius.circular(24),
-                              topRight: Radius.circular(24),
-                            ),
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: SizedBox(
+                      width: 16,
+                      height: 20,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          SvgPicture.asset(
+                            'assets/icons/bell.svg',
+                            width: 16,
+                            height: 20,
                           ),
-                          child: SafeArea(
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 40, height: 4,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.divider,
-                                      borderRadius: BorderRadius.circular(2),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text('Notificaciones', style: AppTextStyles.heading3),
-                                  const SizedBox(height: 16),
-                                  ListTile(
-                                    leading: const Icon(Icons.payment, color: AppColors.primary),
-                                    title: const Text('Pago recibido - Apto 402'),
-                                    subtitle: const Text('Hace 15 min'),
-                                  ),
-                                  ListTile(
-                                    leading: const Icon(Icons.person, color: AppColors.primary),
-                                    title: const Text('Visitante registrado - Torre B'),
-                                    subtitle: const Text('Hace 45 min'),
-                                  ),
-                                  ListTile(
-                                    leading: const Icon(Icons.report_problem, color: AppColors.primary),
-                                    title: const Text('Nueva PQRS - Daño Ascensor'),
-                                    subtitle: const Text('Hace 2 horas'),
-                                  ),
-                                ],
+                          Positioned(
+                            top: 0,
+                            right: -2,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: AppColors.primary,
+                                shape: BoxShape.circle,
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: SizedBox(
-                        width: 16,
-                        height: 20,
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            SvgPicture.asset(
-                              'assets/icons/bell.svg',
-                              width: 16,
-                              height: 20,
-                            ),
-                            Positioned(
-                              top: 0,
-                              right: -2,
-                              child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: AppColors.primary,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                        ],
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // Divider
                   Container(
                     width: 1,
                     height: 32,
                     color: AppColors.divider,
                   ),
                   const SizedBox(width: 16),
-                  // Orange button with plus
-                  GestureDetector(
-                    onTap: () {
-                      showModalBottomSheet(
-                        context: context,
-                        backgroundColor: Colors.transparent,
-                        builder: (ctx) => Container(
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.only(
-                              topLeft: Radius.circular(24),
-                              topRight: Radius.circular(24),
-                            ),
-                          ),
-                          child: SafeArea(
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 40, height: 4,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.divider,
-                                      borderRadius: BorderRadius.circular(2),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text('Acciones Rápidas', style: AppTextStyles.heading3),
-                                  const SizedBox(height: 16),
-                                  ListTile(
-                                    leading: const Icon(Icons.person_add, color: AppColors.primary),
-                                    title: const Text('Agregar Residente'),
-                                    onTap: () {
-                                      Navigator.of(ctx).pop();
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Próximamente: Agregar Residente')),
-                                      );
-                                    },
-                                  ),
-                                  ListTile(
-                                    leading: const Icon(Icons.badge, color: AppColors.primary),
-                                    title: const Text('Registrar Visitante'),
-                                    onTap: () {
-                                      Navigator.of(ctx).pop();
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Próximamente: Registrar Visitante')),
-                                      );
-                                    },
-                                  ),
-                                  ListTile(
-                                    leading: const Icon(Icons.campaign, color: AppColors.primary),
-                                    title: const Text('Enviar Anuncio'),
-                                    onTap: () {
-                                      Navigator.of(ctx).pop();
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Próximamente: Enviar Anuncio')),
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: SvgPicture.asset(
-                        'assets/icons/plus.svg',
-                        width: 10.5,
-                        height: 10.5,
-                        colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-                      ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: SvgPicture.asset(
+                      'assets/icons/plus.svg',
+                      width: 10.5,
+                      height: 10.5,
+                      colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
                     ),
                   ),
                 ],
@@ -369,7 +315,17 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
+  String _formatCurrency(double amount) {
+    if (amount >= 1000000) {
+      return '\$${(amount / 1000000).toStringAsFixed(1)}M';
+    } else if (amount >= 1000) {
+      return '\$${(amount / 1000).toStringAsFixed(0)}K';
+    }
+    return '\$${amount.toStringAsFixed(0)}';
+  }
+
   Widget _buildStatsCards() {
+    final stats = _summary!.stats;
     return Column(
       children: [
         StatCard(
@@ -377,9 +333,7 @@ class DashboardScreen extends StatelessWidget {
           iconWidth: 34,
           iconHeight: 34,
           label: 'Total Unidades',
-          value: '240',
-          changeText: '+2%',
-          isPositive: true,
+          value: '${stats.totalUnits}',
         ),
         const SizedBox(height: 24),
         StatCard(
@@ -387,9 +341,7 @@ class DashboardScreen extends StatelessWidget {
           iconWidth: 38,
           iconHeight: 32,
           label: 'Residentes Activos',
-          value: '856',
-          changeText: '+5%',
-          isPositive: true,
+          value: '${stats.activeResidents}',
         ),
         const SizedBox(height: 24),
         StatCard(
@@ -397,9 +349,7 @@ class DashboardScreen extends StatelessWidget {
           iconWidth: 35,
           iconHeight: 34,
           label: 'Pagos Pendientes',
-          value: '\$12.4M',
-          changeText: '-8%',
-          isPositive: false,
+          value: _formatCurrency(stats.pendingPayments),
         ),
         const SizedBox(height: 24),
         StatCard(
@@ -407,25 +357,23 @@ class DashboardScreen extends StatelessWidget {
           iconWidth: 20,
           iconHeight: 34,
           label: 'PQRS Abiertos',
-          value: '14',
-          changeText: '-12%',
-          isPositive: false,
+          value: '${stats.openPqrs}',
         ),
       ],
     );
   }
 
-  Widget _buildQuickActionsAndFeed(BuildContext context) {
+  Widget _buildQuickActionsAndFeed() {
     return Column(
       children: [
-        _buildQuickActions(context),
+        _buildQuickActions(),
         const SizedBox(height: 32),
-        _buildRecentActivity(context),
+        _buildRecentActivity(),
       ],
     );
   }
 
-  Widget _buildQuickActions(BuildContext context) {
+  Widget _buildQuickActions() {
     return Container(
       padding: const EdgeInsets.all(25),
       decoration: BoxDecoration(
@@ -459,11 +407,6 @@ class DashboardScreen extends StatelessWidget {
                 iconHeight: 20,
                 label: 'Agregar\nResidente',
                 isPrimary: true,
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Próximamente: Agregar Residente')),
-                  );
-                },
               ),
               QuickActionButton(
                 iconAsset: 'assets/icons/action_register_visitor.svg',
@@ -471,33 +414,18 @@ class DashboardScreen extends StatelessWidget {
                 iconHeight: 25,
                 label: 'Registrar\nVisitante',
                 isPrimary: true,
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Próximamente: Registrar Visitante')),
-                  );
-                },
               ),
               QuickActionButton(
                 iconAsset: 'assets/icons/action_announcement.svg',
                 iconWidth: 25,
                 iconHeight: 20,
                 label: 'Enviar Anuncio',
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Próximamente: Enviar Anuncio')),
-                  );
-                },
               ),
               QuickActionButton(
                 iconAsset: 'assets/icons/action_billing.svg',
                 iconWidth: 22.5,
                 iconHeight: 25,
                 label: 'Generar Cobros',
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Próximamente: Generar Cobros')),
-                  );
-                },
               ),
             ],
           ),
@@ -506,7 +434,7 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRecentActivity(BuildContext context) {
+  Widget _buildRecentActivity() {
     return Container(
       padding: const EdgeInsets.all(25),
       decoration: BoxDecoration(
@@ -550,20 +478,12 @@ class DashboardScreen extends StatelessWidget {
             time: 'Hace 2 horas',
           ),
           const SizedBox(height: 16),
-          // "Ver todo el historial" button
           Center(
-            child: GestureDetector(
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Próximamente')),
-                );
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(
-                  'Ver todo el historial',
-                  style: AppTextStyles.bold14.copyWith(color: AppColors.primary),
-                ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'Ver todo el historial',
+                style: AppTextStyles.bold14.copyWith(color: AppColors.primary),
               ),
             ),
           ),
