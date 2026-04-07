@@ -7,24 +7,18 @@ class AuthService {
   final Dio _dio = ApiClient().dio;
   final SessionManager _session = SessionManager();
 
-  /// Step 1: Send email + password, backend sends PIN.
-  /// Returns the message from the server.
-  Future<String> login(String email, String password) async {
-    final response = await _dio.post('/api/v1/auth/login', data: {
-      'email': email,
-      'password': password,
-    });
-    return response.data['data']['message'];
-  }
-
-  /// Step 2: Verify the 6-digit PIN.
-  /// Returns [LoginResponse] with JWT token and user data.
-  Future<LoginResponse> verifyPin(String email, String pin) async {
-    final response = await _dio.post('/api/v1/auth/login/verify-pin', data: {
-      'email': email,
-      'pin': pin,
-    });
-    final loginData = LoginResponse.fromJson(response.data['data']);
+  /// Login with email + password. Returns [LoginResponse]
+  /// with JWT token and user data.
+  Future<LoginResponse> login(
+    String email,
+    String password,
+  ) async {
+    final response = await _dio.post(
+      '/api/v1/auth/login',
+      data: {'email': email, 'password': password},
+    );
+    final loginData =
+        LoginResponse.fromJson(response.data['data']);
 
     await _session.saveSession(
       token: loginData.accessToken,
@@ -41,12 +35,15 @@ class AuthService {
     required String password,
     String? phone,
   }) async {
-    final response = await _dio.post('/api/v1/auth/register', data: {
-      'full_name': fullName,
-      'email': email,
-      'password': password,
-      if (phone != null) 'phone': phone,
-    });
+    final response = await _dio.post(
+      '/api/v1/auth/register',
+      data: {
+        'full_name': fullName,
+        'email': email,
+        'password': password,
+        if (phone != null) 'phone': phone,
+      },
+    );
     return response.data['data']['message'];
   }
 
