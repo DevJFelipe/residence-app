@@ -9,7 +9,7 @@ class StatCard extends StatelessWidget {
   final double iconHeight;
   final String label;
   final String value;
-  final String changeText;
+  final String? changeText;
   final bool isPositive;
 
   const StatCard({
@@ -19,8 +19,8 @@ class StatCard extends StatelessWidget {
     required this.iconHeight,
     required this.label,
     required this.value,
-    required this.changeText,
-    required this.isPositive,
+    this.changeText,
+    this.isPositive = true,
   });
 
   @override
@@ -50,21 +50,22 @@ class StatCard extends StatelessWidget {
                 width: iconWidth,
                 height: iconHeight,
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isPositive
-                      ? AppColors.successBackground
-                      : AppColors.errorBackground,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  changeText,
-                  style: AppTextStyles.badgeText.copyWith(
-                    color: isPositive ? AppColors.success : AppColors.error,
+              if (changeText != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isPositive
+                        ? AppColors.successBackground
+                        : AppColors.errorBackground,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    changeText!,
+                    style: AppTextStyles.badgeText.copyWith(
+                      color: isPositive ? AppColors.success : AppColors.error,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 8),

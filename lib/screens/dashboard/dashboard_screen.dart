@@ -3,6 +3,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../../core/session_manager.dart';
+import '../../services/dashboard_service.dart';
+import '../../models/dashboard_models.dart';
 import '../login/login_screen.dart';
 import 'widgets/stat_card.dart';
 import 'widgets/collections_chart.dart';
@@ -10,8 +13,45 @@ import 'widgets/quick_action_button.dart';
 import 'widgets/activity_item.dart';
 import 'widgets/visitors_table.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  final _dashboardService = DashboardService();
+  DashboardSummary? _summary;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboard();
+  }
+
+  Future<void> _loadDashboard() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final summary = await _dashboardService.getSummary();
+      if (!mounted) return;
+      setState(() {
+        _summary = summary;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'No se pudo cargar el dashboard';
+        _loading = false;
+      });
+    }
+  }
 
   void _showMenu(BuildContext context) {
     showModalBottomSheet(
@@ -86,8 +126,10 @@ class DashboardScreen extends StatelessWidget {
                     fontSize: 15, fontWeight: FontWeight.w600,
                     color: const Color(0xFFEF4444),
                   )),
-                  onTap: () {
+                  onTap: () async {
                     Navigator.of(ctx).pop(); // close sheet
+                    await SessionManager().clear();
+                    if (!context.mounted) return;
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(builder: (_) => const LoginScreen()),
                       (route) => false,
@@ -108,27 +150,53 @@ class DashboardScreen extends StatelessWidget {
       children: [
         _buildHeader(context),
         Expanded(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildWelcomeSection(),
-                  const SizedBox(height: 32),
-                  _buildStatsCards(),
-                  const SizedBox(height: 32),
-                  const CollectionsChart(),
-                  const SizedBox(height: 32),
-                  _buildQuickActionsAndFeed(),
-                  const SizedBox(height: 32),
-                  const VisitorsTable(),
-                ],
-              ),
-            ),
-          ),
+          child: _loading
+              ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+              : _error != null
+                  ? _buildError()
+                  : RefreshIndicator(
+                      onRefresh: _loadDashboard,
+                      color: AppColors.primary,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildWelcomeSection(),
+                              const SizedBox(height: 32),
+                              _buildStatsCards(),
+                              const SizedBox(height: 32),
+                              const CollectionsChart(),
+                              const SizedBox(height: 32),
+                              _buildQuickActionsAndFeed(),
+                              const SizedBox(height: 32),
+                              VisitorsTable(visitors: _summary!.activeVisitors),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
         ),
       ],
+    );
+  }
+
+  Widget _buildError() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(_error!, style: AppTextStyles.bodyLarge),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _loadDashboard,
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('Reintentar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -175,7 +243,6 @@ class DashboardScreen extends StatelessWidget {
               // Right: Bell + Divider + Button
               Row(
                 children: [
-                  // Bell with notification dot
                   Padding(
                     padding: const EdgeInsets.all(8),
                     child: SizedBox(
@@ -206,14 +273,12 @@ class DashboardScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // Divider
                   Container(
                     width: 1,
                     height: 32,
                     color: AppColors.divider,
                   ),
                   const SizedBox(width: 16),
-                  // Orange button with plus
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 8),
@@ -250,7 +315,17 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
+  String _formatCurrency(double amount) {
+    if (amount >= 1000000) {
+      return '\$${(amount / 1000000).toStringAsFixed(1)}M';
+    } else if (amount >= 1000) {
+      return '\$${(amount / 1000).toStringAsFixed(0)}K';
+    }
+    return '\$${amount.toStringAsFixed(0)}';
+  }
+
   Widget _buildStatsCards() {
+    final stats = _summary!.stats;
     return Column(
       children: [
         StatCard(
@@ -258,9 +333,7 @@ class DashboardScreen extends StatelessWidget {
           iconWidth: 34,
           iconHeight: 34,
           label: 'Total Unidades',
-          value: '240',
-          changeText: '+2%',
-          isPositive: true,
+          value: '${stats.totalUnits}',
         ),
         const SizedBox(height: 24),
         StatCard(
@@ -268,9 +341,7 @@ class DashboardScreen extends StatelessWidget {
           iconWidth: 38,
           iconHeight: 32,
           label: 'Residentes Activos',
-          value: '856',
-          changeText: '+5%',
-          isPositive: true,
+          value: '${stats.activeResidents}',
         ),
         const SizedBox(height: 24),
         StatCard(
@@ -278,9 +349,7 @@ class DashboardScreen extends StatelessWidget {
           iconWidth: 35,
           iconHeight: 34,
           label: 'Pagos Pendientes',
-          value: '\$12.4M',
-          changeText: '-8%',
-          isPositive: false,
+          value: _formatCurrency(stats.pendingPayments),
         ),
         const SizedBox(height: 24),
         StatCard(
@@ -288,9 +357,7 @@ class DashboardScreen extends StatelessWidget {
           iconWidth: 20,
           iconHeight: 34,
           label: 'PQRS Abiertos',
-          value: '14',
-          changeText: '-12%',
-          isPositive: false,
+          value: '${stats.openPqrs}',
         ),
       ],
     );
@@ -411,7 +478,6 @@ class DashboardScreen extends StatelessWidget {
             time: 'Hace 2 horas',
           ),
           const SizedBox(height: 16),
-          // "Ver todo el historial" button
           Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),

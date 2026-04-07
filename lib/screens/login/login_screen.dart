@@ -1,7 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:residence_app/services/auth_service.dart';
 import '../admin_shell.dart';
 import '../user_shell.dart';
 
@@ -18,11 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
   static const Color _darkText = Color(0xFF0F1B2D);
   static const Color _primary = Color(0xFFEC5B13);
 
-  // ── Test credentials ──
-  static const _testUsers = {
-    'admin@residence.com': {'pin': '123456', 'role': 'admin'},
-    'residente@residence.com': {'pin': '111111', 'role': 'user'},
-  };
+  final _authService = AuthService();
 
   // Controllers
   final _emailController = TextEditingController();
@@ -36,9 +34,14 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _emailError;
   String? _pinError;
 
+  // Password for the 2-step flow (email+password → PIN)
+  final _passwordController = TextEditingController();
+  String? _passwordError;
+
   @override
   void dispose() {
     _emailController.dispose();
+    _passwordController.dispose();
     for (final c in _pinControllers) {
       c.dispose();
     }
@@ -48,31 +51,42 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  String? _matchedRole;
-
-  void _submitEmail() {
+  Future<void> _submitEmail() async {
     final email = _emailController.text.trim().toLowerCase();
-    setState(() => _emailError = null);
+    final password = _passwordController.text;
+    setState(() {
+      _emailError = null;
+      _passwordError = null;
+    });
 
     if (email.isEmpty) {
       setState(() => _emailError = 'Ingrese su correo electrónico');
       return;
     }
-
-    if (!_testUsers.containsKey(email)) {
-      setState(() => _emailError = 'Correo no registrado. Pruebe:\n• admin@residence.com\n• residente@residence.com');
+    if (password.isEmpty) {
+      setState(() => _passwordError = 'Ingrese su contraseña');
       return;
     }
 
-    setState(() {
-      _emailSubmitted = true;
-      _emailError = null;
-      _matchedRole = _testUsers[email]!['role'];
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _pinFocusNodes[0].requestFocus();
-    });
+    setState(() => _isLoading = true);
+    try {
+      await _authService.login(email, password);
+      if (!mounted) return;
+      setState(() {
+        _emailSubmitted = true;
+        _emailError = null;
+        _isLoading = false;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _pinFocusNodes[0].requestFocus();
+      });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _emailError = AuthService.parseError(e);
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _verifyPin() async {
@@ -85,36 +99,34 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    final user = _testUsers[email];
-    if (user == null || pin != user['pin']) {
-      final correctPin = user?['pin'] ?? '???';
-      setState(() => _pinError = 'Código incorrecto. Use: $correctPin');
+    setState(() => _isLoading = true);
+    try {
+      final loginResponse = await _authService.verifyPin(email, pin);
+      if (!mounted) return;
+
+      final isAdmin = loginResponse.isAdmin;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => isAdmin ? const AdminShell() : const UserShell(),
+        ),
+      );
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _pinError = AuthService.parseError(e);
+        _isLoading = false;
+      });
       for (final c in _pinControllers) {
         c.clear();
       }
       _pinFocusNodes[0].requestFocus();
-      return;
     }
-
-    // Success — show loading then navigate based on role
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 800));
-
-    if (!mounted) return;
-
-    final isAdmin = user['role'] == 'admin';
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => isAdmin ? const AdminShell() : const UserShell(),
-      ),
-    );
   }
 
   void _resetToEmail() {
     setState(() {
       _emailSubmitted = false;
       _pinError = null;
-      _matchedRole = null;
       for (final c in _pinControllers) {
         c.clear();
       }
@@ -299,7 +311,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ),
         ),
-        // Error message
+        // Email error
         if (_emailError != null)
           Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -314,31 +326,121 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
+        const SizedBox(height: 20),
+        // Password label
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Text(
+              'CONTRASEÑA',
+              style: GoogleFonts.dmSans(
+                fontSize: 12, fontWeight: FontWeight.w700,
+                height: 16 / 12, letterSpacing: 1.2,
+                color: _darkText.withValues(alpha: 0.5),
+              ),
+            ),
+          ),
+        ),
+        // Password input
+        Container(
+          height: 56,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _passwordError != null
+                  ? const Color(0xFFEF4444)
+                  : _emailSubmitted
+                      ? const Color(0xFF22C55E)
+                      : _darkText.withValues(alpha: 0.1),
+              width: _passwordError != null || _emailSubmitted ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 16, right: 13),
+                child: Icon(Icons.lock_outline, size: 20,
+                    color: _darkText.withValues(alpha: 0.4)),
+              ),
+              Expanded(
+                child: TextField(
+                  controller: _passwordController,
+                  enabled: !_emailSubmitted,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    hintText: '••••••••',
+                    hintStyle: GoogleFonts.dmSans(
+                      fontSize: 16, fontWeight: FontWeight.w400, color: const Color(0xFF6B7280),
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                    isDense: true,
+                  ),
+                  style: GoogleFonts.dmSans(
+                    fontSize: 16, fontWeight: FontWeight.w400, color: _darkText,
+                  ),
+                  onSubmitted: (_) => _submitEmail(),
+                ),
+              ),
+              if (_emailSubmitted)
+                const Padding(
+                  padding: EdgeInsets.only(right: 16),
+                  child: Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 20),
+                ),
+            ],
+          ),
+        ),
+        // Password error
+        if (_passwordError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                _passwordError!,
+                style: GoogleFonts.dmSans(
+                  fontSize: 12, fontWeight: FontWeight.w500,
+                  color: const Color(0xFFEF4444),
+                ),
+              ),
+            ),
+          ),
         const SizedBox(height: 24),
         // "Siguiente →" button
         GestureDetector(
-          onTap: _emailSubmitted ? _resetToEmail : _submitEmail,
+          onTap: _isLoading ? null : (_emailSubmitted ? _resetToEmail : _submitEmail),
           child: Container(
             height: 56,
             decoration: BoxDecoration(
               color: _emailSubmitted ? const Color(0xFF22C55E) : _darkText,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  _emailSubmitted ? 'Correo verificado ✓' : 'Siguiente',
-                  style: GoogleFonts.dmSans(
-                    fontSize: 18, fontWeight: FontWeight.w700,
-                    height: 28 / 18, color: _bgColor,
-                  ),
-                ),
-                if (!_emailSubmitted) ...[
-                  const SizedBox(width: 8),
-                  SvgPicture.asset('assets/icons/login_arrow.svg', width: 16, height: 16),
-                ],
-              ],
+            child: Center(
+              child: _isLoading && !_emailSubmitted
+                  ? const SizedBox(
+                      width: 24, height: 24,
+                      child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2.5,
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          _emailSubmitted ? 'Credenciales verificadas' : 'Siguiente',
+                          style: GoogleFonts.dmSans(
+                            fontSize: 18, fontWeight: FontWeight.w700,
+                            height: 28 / 18, color: _bgColor,
+                          ),
+                        ),
+                        if (!_emailSubmitted) ...[
+                          const SizedBox(width: 8),
+                          SvgPicture.asset('assets/icons/login_arrow.svg', width: 16, height: 16),
+                        ],
+                      ],
+                    ),
             ),
           ),
         ),
@@ -511,41 +613,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               textAlign: TextAlign.center,
             ),
-            // Dev hint
-            if (_emailSubmitted) ...[
-              Padding(
-                padding: const EdgeInsets.only(top: 24),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: _darkText.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        '🔑 PIN: ${_testUsers[_emailController.text.trim().toLowerCase()]?['pin'] ?? ''}',
-                        style: GoogleFonts.dmSans(
-                          fontSize: 12, fontWeight: FontWeight.w600,
-                          color: _darkText.withValues(alpha: 0.5),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _matchedRole == 'admin' ? '👤 Rol: Administrador' : '🏠 Rol: Residente',
-                        style: GoogleFonts.dmSans(
-                          fontSize: 11, fontWeight: FontWeight.w400,
-                          color: _darkText.withValues(alpha: 0.35),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
           ],
         ),
       ),
