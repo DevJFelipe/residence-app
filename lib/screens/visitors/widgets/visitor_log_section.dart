@@ -1,54 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
+import '../../../providers/visitor_provider.dart';
 
-class _LogEntry {
-  final String name;
-  final String subtitle;
-  final String unit;
-  final String entryTime;
-  final String exitTime;
-
-  const _LogEntry({
-    required this.name,
-    required this.subtitle,
-    required this.unit,
-    required this.entryTime,
-    required this.exitTime,
-  });
-}
-
-class VisitorLogSection extends StatelessWidget {
+class VisitorLogSection extends ConsumerWidget {
   const VisitorLogSection({super.key});
 
-  static const List<_LogEntry> _entries = [
-    _LogEntry(
-      name: 'Ana\nGabriela\nLópez',
-      subtitle: 'ID: 10,234,556',
-      unit: 'Apto\n502-A',
-      entryTime: '08:30\nAM',
-      exitTime: '09:45\nAM',
-    ),
-    _LogEntry(
-      name: 'Servicios\nEléctricos\nS.A.',
-      subtitle: 'Mantenimiento',
-      unit: 'Áreas\nComunes',
-      entryTime: '07:15\nAM',
-      exitTime: '11:20\nAM',
-    ),
-    _LogEntry(
-      name: 'Javier\nSoto',
-      subtitle: 'ID: 8,990,221',
-      unit: 'Casa 22',
-      entryTime: '10:05\nAM',
-      exitTime: '11:55\nAM',
-    ),
-  ];
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final logAsync = ref.watch(visitorLogProvider);
+
     return Column(
       children: [
         // Section header
@@ -100,135 +64,161 @@ class VisitorLogSection extends StatelessWidget {
               ),
             ],
           ),
-          child: Column(
-            children: [
-              // Horizontally scrollable table
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Table header
-                    Container(
-                      color: AppColors.surfaceLight,
-                      child: Row(
-                        children: [
-                          _headerCell('VISITANTE', 117),
-                          _headerCell('UNIDAD', 109),
-                          _headerCell('ENTRADA', 104),
-                          _headerCell('SALIDA', 91),
-                        ],
-                      ),
-                    ),
-                    // Table rows
-                    ...List.generate(_entries.length, (index) {
-                      final entry = _entries[index];
-                      return Container(
-                        decoration: index > 0
-                            ? const BoxDecoration(
-                                border: Border(
-                                  top: BorderSide(color: AppColors.borderLight),
-                                ),
-                              )
-                            : null,
+          child: logAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              ),
+            ),
+            error: (_, __) => Padding(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: Text('Error cargando bitácora',
+                    style: AppTextStyles.bodyMedium),
+              ),
+            ),
+            data: (entries) => Column(
+              children: [
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Table header
+                      Container(
+                        color: AppColors.surfaceLight,
                         child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Visitor name + subtitle
-                            SizedBox(
-                              width: 117,
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      entry.name,
-                                      style: AppTextStyles.medium14,
-                                    ),
-                                    Text(
-                                      entry.subtitle,
-                                      style: GoogleFonts.publicSans(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w400,
-                                        height: 20 / 10,
-                                        color: const Color(0xFF94A3B8),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            // Unit
-                            SizedBox(
-                              width: 109,
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(24, 36, 24, 36),
-                                child: Text(
-                                  entry.unit,
-                                  style: GoogleFonts.publicSans(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w400,
-                                    height: 20 / 14,
-                                    color: const Color(0xFF475569),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            // Entry time
-                            SizedBox(
-                              width: 104,
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(24, 36, 24, 36),
-                                child: Text(
-                                  entry.entryTime,
-                                  style: GoogleFonts.publicSans(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w400,
-                                    height: 20 / 14,
-                                    color: AppColors.textDark,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            // Exit time
-                            SizedBox(
-                              width: 91,
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(24, 36, 24, 36),
-                                child: Text(
-                                  entry.exitTime,
-                                  style: GoogleFonts.publicSans(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w400,
-                                    height: 20 / 14,
-                                    color: AppColors.textDark,
-                                  ),
-                                ),
-                              ),
-                            ),
+                            _headerCell('VISITANTE', 117),
+                            _headerCell('UNIDAD', 109),
+                            _headerCell('ENTRADA', 104),
+                            _headerCell('SALIDA', 91),
                           ],
                         ),
-                      );
-                    }),
-                  ],
+                      ),
+                      if (entries.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(
+                            'Sin registros de salida hoy',
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        )
+                      else
+                        ...List.generate(entries.length, (index) {
+                          final entry = entries[index];
+                          return Container(
+                            decoration: index > 0
+                                ? const BoxDecoration(
+                                    border: Border(
+                                      top: BorderSide(
+                                          color: AppColors.borderLight),
+                                    ),
+                                  )
+                                : null,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SizedBox(
+                                  width: 117,
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        24, 16, 24, 16),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          entry['name'] ?? '',
+                                          style: AppTextStyles.medium14,
+                                        ),
+                                        Text(
+                                          entry['subtitle'] ?? '',
+                                          style: GoogleFonts.publicSans(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w400,
+                                            height: 20 / 10,
+                                            color: const Color(0xFF94A3B8),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: 109,
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        24, 36, 24, 36),
+                                    child: Text(
+                                      entry['unit'] ?? '',
+                                      style: GoogleFonts.publicSans(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w400,
+                                        height: 20 / 14,
+                                        color: const Color(0xFF475569),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: 104,
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        24, 36, 24, 36),
+                                    child: Text(
+                                      entry['entryTime'] ?? '',
+                                      style: GoogleFonts.publicSans(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w400,
+                                        height: 20 / 14,
+                                        color: AppColors.textDark,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: 91,
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        24, 36, 24, 36),
+                                    child: Text(
+                                      entry['exitTime'] ?? '',
+                                      style: GoogleFonts.publicSans(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w400,
+                                        height: 20 / 14,
+                                        color: AppColors.textDark,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                    ],
+                  ),
                 ),
-              ),
-              // Footer
-              Container(
-                width: double.infinity,
-                color: AppColors.surfaceLight,
-                padding: const EdgeInsets.all(16),
-                child: Center(
-                  child: Text(
-                    'Ver registro completo',
-                    style: AppTextStyles.bold12.copyWith(
-                      color: AppColors.primary,
+                // Footer
+                Container(
+                  width: double.infinity,
+                  color: AppColors.surfaceLight,
+                  padding: const EdgeInsets.all(16),
+                  child: Center(
+                    child: Text(
+                      'Ver registro completo',
+                      style: AppTextStyles.bold12.copyWith(
+                        color: AppColors.primary,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],

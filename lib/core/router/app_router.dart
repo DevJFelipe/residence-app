@@ -42,6 +42,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         return RouteNames.login;
       }
 
+      // If authenticated and on public routes, redirect to the correct shell
+      final isPublicRoute = location == RouteNames.welcome ||
+          location == RouteNames.login;
+      if (auth.isAuthenticated && isPublicRoute) {
+        return auth.role == 'admin' ? '/admin' : '/user';
+      }
+
       return null;
     },
     routes: [

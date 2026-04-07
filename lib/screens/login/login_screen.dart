@@ -1,21 +1,22 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:residence_app/providers/auth_provider.dart';
 import 'package:residence_app/services/auth_service.dart';
-import '../admin_shell.dart';
-import '../user_shell.dart';
 import 'register_screen.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   static const Color _bgColor = Color(0xFFF7F4EF);
   static const Color _darkText = Color(0xFF0F1B2D);
   static const Color _primary = Color(0xFFEC5B13);
@@ -66,14 +67,13 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       if (!mounted) return;
 
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (_) => response.isAdmin
-              ? const AdminShell()
-              : const UserShell(),
-        ),
-        (route) => false,
+      ref.read(authStateProvider.notifier).setAuthenticated(
+        role: response.isAdmin ? 'admin' : 'user',
+        email: response.email,
+        name: response.fullName,
       );
+      if (!mounted) return;
+      context.go(response.isAdmin ? '/admin' : '/user');
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() {

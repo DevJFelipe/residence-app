@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import 'dashboard/dashboard_screen.dart';
-import 'visitors/visitors_screen.dart';
+import 'residents/residents_screen.dart';
 import 'billing/billing_screen.dart';
 import 'dashboard/widgets/bottom_nav_bar.dart';
 import 'package:residence_app/ui/screens/admin/pqrs/pqrs_screen.dart';
@@ -25,7 +25,7 @@ class _AdminShellState extends State<AdminShell> {
         index: _currentIndex,
         children: const [
           DashboardScreen(),
-          VisitorsScreen(),
+          ResidentsScreen(),
           BillingScreen(),
           PqrsScreen(),
           MoreScreen(),

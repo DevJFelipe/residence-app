@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/session_manager.dart';
 import '../data/repositories/auth_repository.dart';
 import '../data/datasources/mock/mock_auth_datasource.dart';
 
@@ -8,7 +9,9 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 
 final authStateProvider =
     StateNotifierProvider<AuthNotifier, AuthStateData>((ref) {
-  return AuthNotifier(ref.read(authRepositoryProvider));
+  final notifier = AuthNotifier(ref.read(authRepositoryProvider));
+  notifier.restoreSession();
+  return notifier;
 });
 
 class AuthStateData {
@@ -40,8 +43,45 @@ class AuthStateData {
 
 class AuthNotifier extends StateNotifier<AuthStateData> {
   final AuthRepository _repo;
+  final SessionManager _session = SessionManager();
 
   AuthNotifier(this._repo) : super(const AuthStateData());
+
+  /// Restore session from SharedPreferences on app start.
+  Future<void> restoreSession() async {
+    final user = await _session.getUser();
+    final token = await _session.getToken();
+    if (user != null && token != null) {
+      final condominiums = user['condominiums'] as List?;
+      String? role;
+      if (condominiums != null && condominiums.isNotEmpty) {
+        final roleName = condominiums[0]['role'] as String?;
+        role = (roleName == 'admin' || roleName == 'super_admin')
+            ? 'admin'
+            : 'user';
+      }
+      state = AuthStateData(
+        isAuthenticated: true,
+        role: role,
+        email: user['email'] as String?,
+        name: user['full_name'] as String?,
+      );
+    }
+  }
+
+  /// Set authenticated state directly (used after real API login).
+  void setAuthenticated({
+    required String role,
+    required String email,
+    required String name,
+  }) {
+    state = AuthStateData(
+      isAuthenticated: true,
+      role: role,
+      email: email,
+      name: name,
+    );
+  }
 
   /// Validates email. Returns the user role on success, null on failure.
   Future<String?> login(String email) async {
@@ -66,6 +106,7 @@ class AuthNotifier extends StateNotifier<AuthStateData> {
   /// Logs out and resets state.
   Future<void> logout() async {
     await _repo.logout();
+    await _session.clear();
     state = const AuthStateData();
   }
 }
