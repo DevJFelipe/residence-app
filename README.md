@@ -97,7 +97,11 @@ lib/
 
 ## Configuración Backend
 
-La app se conecta a `http://localhost:8000`. Para cambiar el URL base, editar `lib/core/api_client.dart`.
+La app se conecta a `http://localhost:8000` por defecto. Para apuntar a producción u otro servidor, editar el `baseUrl` en `lib/core/api_client.dart`.
+
+**Backend en producción:** `http://3.227.231.47`
+- Swagger UI: http://3.227.231.47/docs
+- ReDoc: http://3.227.231.47/redoc
 
 Asegurarse de ejecutar los seeds del backend antes de usar la app:
 ```bash
