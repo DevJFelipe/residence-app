@@ -24,6 +24,7 @@ class _AddResidentSheetState extends State<AddResidentSheet> {
   final _service = ResidentsService();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _docController = TextEditingController();
   bool _submitting = false;
@@ -66,6 +67,7 @@ class _AddResidentSheetState extends State<AddResidentSheet> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _passwordController.dispose();
     _phoneController.dispose();
     _docController.dispose();
     super.dispose();
@@ -74,8 +76,13 @@ class _AddResidentSheetState extends State<AddResidentSheet> {
   Future<void> _submit() async {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
-    if (name.isEmpty || email.isEmpty) {
-      setState(() => _error = 'Nombre y correo son obligatorios');
+    final password = _passwordController.text;
+    if (name.isEmpty || email.isEmpty || password.isEmpty) {
+      setState(() => _error = 'Nombre, correo y contraseña son obligatorios');
+      return;
+    }
+    if (password.length < 6) {
+      setState(() => _error = 'La contraseña debe tener al menos 6 caracteres');
       return;
     }
 
@@ -88,7 +95,7 @@ class _AddResidentSheetState extends State<AddResidentSheet> {
       await _service.addResident(
         fullName: name,
         email: email,
-        password: 'Residence2024!', // temp default password
+        password: password,
         propertyId: widget.propertyId,
         relationTypeId: _selectedRelationType,
         phone: _phoneController.text.trim().isNotEmpty
@@ -169,6 +176,10 @@ class _AddResidentSheetState extends State<AddResidentSheet> {
             _buildField('Correo electrónico *', 'correo@ejemplo.com',
                 _emailController,
                 keyboardType: TextInputType.emailAddress),
+            const SizedBox(height: 16),
+            _buildField('Contraseña *', 'Mínimo 6 caracteres',
+                _passwordController,
+                obscureText: true),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -265,7 +276,7 @@ class _AddResidentSheetState extends State<AddResidentSheet> {
 
   Widget _buildField(
       String label, String hint, TextEditingController controller,
-      {TextInputType? keyboardType}) {
+      {TextInputType? keyboardType, bool obscureText = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -281,6 +292,7 @@ class _AddResidentSheetState extends State<AddResidentSheet> {
         TextField(
           controller: controller,
           keyboardType: keyboardType,
+          obscureText: obscureText,
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: GoogleFonts.publicSans(

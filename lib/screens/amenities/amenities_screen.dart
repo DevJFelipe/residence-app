@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:residence_app/models/amenity_models.dart';
 import 'package:residence_app/services/amenities_service.dart';
 import 'reservation_screen.dart';
+import 'my_reservations_screen.dart';
 
 class AmenitiesScreen extends StatefulWidget {
   final bool embedded;
@@ -200,20 +201,41 @@ class _AmenitiesScreenState extends State<AmenitiesScreen> {
                       ),
                     ),
                   if (!widget.embedded) const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Áreas Comunes',
-                        style: GoogleFonts.publicSans(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          height: 25 / 20,
-                          color: _darkText,
+                  Expanded(
+                    child: Text(
+                      'Áreas Comunes',
+                      style: GoogleFonts.publicSans(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        height: 25 / 20,
+                        color: _darkText,
+                      ),
+                    ),
+                  ),
+                  if (!widget.embedded)
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const MyReservationsScreen(),
                         ),
                       ),
-                    ],
-                  ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _accent.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'Mis Reservas',
+                          style: GoogleFonts.publicSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _accent,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),

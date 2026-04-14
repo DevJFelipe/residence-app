@@ -101,4 +101,29 @@ class ApiVisitorDatasource implements VisitorRepository {
   Future<void> registerExit(String visitorId) async {
     await _dio.post('/api/v1/visitors/$visitorId/exit');
   }
+
+  @override
+  Future<List<Map<String, dynamic>>> getPendingVisitors() async {
+    final response = await _dio.get('/api/v1/visitors/pending');
+    final List data = response.data['data'];
+    return data.map<Map<String, dynamic>>((v) {
+      return {
+        'id': v['id'],
+        'name': v['visitor_name'] ?? '',
+        'location': v['property_number'] != null
+            ? 'Apto ${v['property_number']}'
+            : '--',
+        'authorized_by': v['authorized_by_name'] ?? '',
+        'document': v['document_number'] ?? '',
+        'vehicle': v['vehicle_plate'] ?? '',
+        'notes': v['notes'] ?? '',
+        'created_at': v['created_at'],
+      };
+    }).toList();
+  }
+
+  @override
+  Future<void> confirmEntry(String visitorId) async {
+    await _dio.post('/api/v1/visitors/$visitorId/confirm-entry');
+  }
 }

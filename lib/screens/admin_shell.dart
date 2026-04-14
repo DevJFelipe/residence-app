@@ -17,18 +17,24 @@ class AdminShell extends StatefulWidget {
 class _AdminShellState extends State<AdminShell> {
   int _currentIndex = 0;
 
+  void _switchTab(int index) {
+    if (index >= 0 && index < 5) {
+      setState(() => _currentIndex = index);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: IndexedStack(
         index: _currentIndex,
-        children: const [
-          DashboardScreen(),
-          ResidentsScreen(),
-          BillingScreen(),
-          PqrsScreen(),
-          MoreScreen(),
+        children: [
+          DashboardScreen(onSwitchTab: _switchTab),
+          const ResidentsScreen(),
+          const BillingScreen(),
+          const PqrsScreen(),
+          const MoreScreen(),
         ],
       ),
       bottomNavigationBar: AppBottomNavBar(

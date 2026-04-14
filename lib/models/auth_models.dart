@@ -65,7 +65,7 @@ class LoginResponse {
     this.phone,
     required this.condominiums,
     this.properties = const [],
-    required this.accessToken,
+    this.accessToken = '',
     this.message,
   });
 
@@ -82,7 +82,7 @@ class LoginResponse {
               ?.map((p) => UserProperty.fromJson(p))
               .toList() ??
           [],
-      accessToken: json['access_token'],
+      accessToken: json['access_token'] ?? '',
       message: json['message'],
     );
   }

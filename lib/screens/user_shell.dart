@@ -5,6 +5,7 @@ import 'amenities/amenities_screen.dart';
 import 'amenities/my_reservations_screen.dart';
 import 'package:residence_app/ui/screens/user/home/user_home_screen.dart';
 import 'package:residence_app/ui/screens/user/profile/user_profile_screen.dart';
+import 'package:residence_app/ui/screens/user/visitors/user_visitors_screen.dart';
 
 class UserShell extends StatefulWidget {
   const UserShell({super.key});
@@ -19,17 +20,24 @@ class _UserShellState extends State<UserShell> {
 
   int _currentIndex = 0;
 
+  void _switchTab(int index) {
+    if (index >= 0 && index < 5) {
+      setState(() => _currentIndex = index);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F4EF),
       body: IndexedStack(
         index: _currentIndex,
-        children: const [
-          UserHomeScreen(),
-          AmenitiesScreen(embedded: true),
-          MyReservationsScreen(embedded: true),
-          UserProfileScreen(),
+        children: [
+          UserHomeScreen(onSwitchTab: _switchTab),
+          const AmenitiesScreen(embedded: true),
+          const MyReservationsScreen(embedded: true),
+          const UserVisitorsScreen(),
+          const UserProfileScreen(),
         ],
       ),
       bottomNavigationBar: _buildBottomNav(context),
@@ -41,6 +49,7 @@ class _UserShellState extends State<UserShell> {
       _NavItem(icon: 'assets/icons/area_nav_home.svg', label: 'Inicio', w: 16, h: 18),
       _NavItem(icon: 'assets/icons/area_nav_areas.svg', label: 'Áreas', w: 19.3, h: 19.3),
       _NavItem(icon: 'assets/icons/area_nav_reservas.svg', label: 'Reservas', w: 18, h: 20),
+      _NavItem(icon: 'assets/icons/visitor_active_list.svg', label: 'Visitantes', w: 20, h: 12),
       _NavItem(icon: 'assets/icons/area_nav_perfil.svg', label: 'Perfil', w: 16, h: 16),
     ];
 

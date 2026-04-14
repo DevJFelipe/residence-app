@@ -1,20 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
-import '../../core/session_manager.dart';
+import '../../core/api_client.dart';
 import '../../services/dashboard_service.dart';
 import '../../models/dashboard_models.dart';
-import '../login/login_screen.dart';
 import 'widgets/stat_card.dart';
-import 'widgets/collections_chart.dart';
 import 'widgets/quick_action_button.dart';
-import 'widgets/activity_item.dart';
 import 'widgets/visitors_table.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final void Function(int)? onSwitchTab;
+
+  const DashboardScreen({super.key, this.onSwitchTab});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -22,7 +20,9 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final _dashboardService = DashboardService();
+  final _dio = ApiClient().dio;
   DashboardSummary? _summary;
+  List<Map<String, dynamic>> _notifications = [];
   bool _loading = true;
   String? _error;
 
@@ -38,110 +38,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _error = null;
     });
     try {
-      final summary = await _dashboardService.getSummary();
+      final results = await Future.wait([
+        _dashboardService.getSummary(),
+        _dio.get('/api/v1/notifications/me'),
+      ]);
       if (!mounted) return;
       setState(() {
-        _summary = summary;
+        _summary = results[0] as DashboardSummary;
+        final notifResp = results[1] as dynamic;
+        _notifications = List<Map<String, dynamic>>.from(notifResp.data['data'])
+            .take(5)
+            .toList();
         _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = 'No se pudo cargar el dashboard';
-        _loading = false;
-      });
+      // Try loading just the dashboard summary if notifications fail
+      try {
+        final summary = await _dashboardService.getSummary();
+        if (!mounted) return;
+        setState(() {
+          _summary = summary;
+          _loading = false;
+        });
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          _error = 'No se pudo cargar el dashboard';
+          _loading = false;
+        });
+      }
     }
-  }
-
-  void _showMenu(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Handle
-                Container(
-                  width: 40, height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.divider,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                // Header
-                Row(
-                  children: [
-                    Container(
-                      width: 40, height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Center(
-                        child: Text('AD', style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14,
-                        )),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Administrador', style: GoogleFonts.publicSans(
-                          fontSize: 16, fontWeight: FontWeight.w700,
-                          color: AppColors.textDark,
-                        )),
-                        Text('admin@residence.com', style: GoogleFonts.publicSans(
-                          fontSize: 13, fontWeight: FontWeight.w400,
-                          color: AppColors.textSecondary,
-                        )),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                const Divider(height: 1, color: AppColors.borderLight),
-                const SizedBox(height: 8),
-                // Logout
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(
-                    Icons.logout_rounded,
-                    color: Color(0xFFEF4444),
-                    size: 22,
-                  ),
-                  title: Text('Cerrar sesión', style: GoogleFonts.publicSans(
-                    fontSize: 15, fontWeight: FontWeight.w600,
-                    color: const Color(0xFFEF4444),
-                  )),
-                  onTap: () async {
-                    Navigator.of(ctx).pop(); // close sheet
-                    await SessionManager().clear();
-                    if (!context.mounted) return;
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
-                      (route) => false,
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
   }
 
   @override
@@ -160,18 +87,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: SingleChildScrollView(
                         physics: const AlwaysScrollableScrollPhysics(),
                         child: Padding(
-                          padding: const EdgeInsets.all(32),
+                          padding: const EdgeInsets.all(24),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildWelcomeSection(),
-                              const SizedBox(height: 32),
+                              const SizedBox(height: 24),
                               _buildStatsCards(),
-                              const SizedBox(height: 32),
-                              const CollectionsChart(),
-                              const SizedBox(height: 32),
-                              _buildQuickActionsAndFeed(),
-                              const SizedBox(height: 32),
+                              const SizedBox(height: 24),
+                              _buildQuickActions(),
+                              const SizedBox(height: 24),
+                              _buildRecentNotifications(),
+                              const SizedBox(height: 24),
                               VisitorsTable(visitors: _summary!.activeVisitors),
                             ],
                           ),
@@ -202,100 +129,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildHeader(BuildContext context) {
     return Container(
-      padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top,
-      ),
+      padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
       decoration: const BoxDecoration(
         color: AppColors.cardBackground,
-        border: Border(
-          bottom: BorderSide(color: AppColors.divider),
-        ),
+        border: Border(bottom: BorderSide(color: AppColors.divider)),
       ),
       child: SizedBox(
         height: 64,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Left: Menu + Logo
-              Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => _showMenu(context),
-                    behavior: HitTestBehavior.opaque,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: SvgPicture.asset(
-                        'assets/icons/menu.svg',
-                        width: 18,
-                        height: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Text(
-                    'Residence',
-                    style: AppTextStyles.heading3.copyWith(fontSize: 18),
-                  ),
-                ],
-              ),
-              // Right: Bell + Divider + Button
-              Row(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: SizedBox(
-                      width: 16,
-                      height: 20,
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          SvgPicture.asset(
-                            'assets/icons/bell.svg',
-                            width: 16,
-                            height: 20,
-                          ),
-                          Positioned(
-                            top: 0,
-                            right: -2,
-                            child: Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: AppColors.primary,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    width: 1,
-                    height: 32,
-                    color: AppColors.divider,
-                  ),
-                  const SizedBox(width: 16),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: SvgPicture.asset(
-                      'assets/icons/plus.svg',
-                      width: 10.5,
-                      height: 10.5,
-                      colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Residence',
+              style: AppTextStyles.heading3.copyWith(fontSize: 18),
+            ),
           ),
         ),
       ),
@@ -335,7 +183,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           label: 'Total Unidades',
           value: '${stats.totalUnits}',
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         StatCard(
           iconAsset: 'assets/icons/stat_residents.svg',
           iconWidth: 38,
@@ -343,7 +191,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           label: 'Residentes Activos',
           value: '${stats.activeResidents}',
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         StatCard(
           iconAsset: 'assets/icons/stat_payments.svg',
           iconWidth: 35,
@@ -351,7 +199,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           label: 'Pagos Pendientes',
           value: _formatCurrency(stats.pendingPayments),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         StatCard(
           iconAsset: 'assets/icons/stat_pqrs.svg',
           iconWidth: 20,
@@ -363,29 +211,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildQuickActionsAndFeed() {
-    return Column(
-      children: [
-        _buildQuickActions(),
-        const SizedBox(height: 32),
-        _buildRecentActivity(),
-      ],
-    );
-  }
-
   Widget _buildQuickActions() {
     return Container(
-      padding: const EdgeInsets.all(25),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.cardBackground,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderLight),
         boxShadow: const [
-          BoxShadow(
-            color: Color(0x0D000000),
-            blurRadius: 2,
-            offset: Offset(0, 1),
-          ),
+          BoxShadow(color: Color(0x0D000000), blurRadius: 2, offset: Offset(0, 1)),
         ],
       ),
       child: Column(
@@ -405,27 +239,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 iconAsset: 'assets/icons/action_add_resident.svg',
                 iconWidth: 27.5,
                 iconHeight: 20,
-                label: 'Agregar\nResidente',
+                label: 'Residentes',
                 isPrimary: true,
-              ),
-              QuickActionButton(
-                iconAsset: 'assets/icons/action_register_visitor.svg',
-                iconWidth: 25,
-                iconHeight: 25,
-                label: 'Registrar\nVisitante',
-                isPrimary: true,
-              ),
-              QuickActionButton(
-                iconAsset: 'assets/icons/action_announcement.svg',
-                iconWidth: 25,
-                iconHeight: 20,
-                label: 'Enviar Anuncio',
+                onTap: () => widget.onSwitchTab?.call(1),
               ),
               QuickActionButton(
                 iconAsset: 'assets/icons/action_billing.svg',
                 iconWidth: 22.5,
                 iconHeight: 25,
-                label: 'Generar Cobros',
+                label: 'Pagos',
+                isPrimary: true,
+                onTap: () => widget.onSwitchTab?.call(2),
+              ),
+              QuickActionButton(
+                iconAsset: 'assets/icons/activity_pqrs.svg',
+                iconWidth: 20,
+                iconHeight: 20,
+                label: 'PQRS',
+                onTap: () => widget.onSwitchTab?.call(3),
+              ),
+              QuickActionButton(
+                iconAsset: 'assets/icons/action_announcement.svg',
+                iconWidth: 25,
+                iconHeight: 20,
+                label: 'Más opciones',
+                onTap: () => widget.onSwitchTab?.call(4),
               ),
             ],
           ),
@@ -434,57 +272,77 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildRecentActivity() {
+  Widget _buildRecentNotifications() {
     return Container(
-      padding: const EdgeInsets.all(25),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.cardBackground,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderLight),
         boxShadow: const [
-          BoxShadow(
-            color: Color(0x0D000000),
-            blurRadius: 2,
-            offset: Offset(0, 1),
-          ),
+          BoxShadow(color: Color(0x0D000000), blurRadius: 2, offset: Offset(0, 1)),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Actividad Reciente', style: AppTextStyles.heading3),
+          Text('Notificaciones Recientes', style: AppTextStyles.heading3),
           const SizedBox(height: 16),
-          const ActivityItem(
-            iconBackground: AppColors.activityPaymentBg,
-            iconAsset: 'assets/icons/activity_payment.svg',
-            iconSize: 11.667,
-            title: 'Pago Recibido - Apto 402',
-            time: 'Hace 15 min',
-          ),
-          const SizedBox(height: 16),
-          const ActivityItem(
-            iconBackground: AppColors.activityVisitorBg,
-            iconAsset: 'assets/icons/activity_visitor.svg',
-            iconSize: 9.333,
-            title: 'Visitante Registrado - Torre B',
-            time: 'Hace 45 min',
-          ),
-          const SizedBox(height: 16),
-          const ActivityItem(
-            iconBackground: AppColors.activityPqrsBg,
-            iconAsset: 'assets/icons/activity_pqrs.svg',
-            iconSize: 10.5,
-            title: 'Nueva PQRS - Daño Ascensor',
-            time: 'Hace 2 horas',
-          ),
-          const SizedBox(height: 16),
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'Ver todo el historial',
-                style: AppTextStyles.bold14.copyWith(color: AppColors.primary),
+          if (_notifications.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Center(
+                child: Text('Sin notificaciones recientes',
+                    style: GoogleFonts.publicSans(fontSize: 13, color: Colors.grey)),
               ),
+            )
+          else
+            ..._notifications.map((n) => _notificationTile(n)),
+        ],
+      ),
+    );
+  }
+
+  Widget _notificationTile(Map<String, dynamic> n) {
+    final title = n['title'] ?? '';
+    final body = n['body'] ?? n['message'] ?? '';
+    final isRead = n['is_read'] == true || n['read_at'] != null;
+    final date = n['created_at'] != null ? DateTime.tryParse(n['created_at']) : null;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            margin: const EdgeInsets.only(top: 6, right: 10),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isRead ? Colors.grey.shade300 : AppColors.primary,
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: GoogleFonts.publicSans(
+                        fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+                if (body.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(body,
+                      style: GoogleFonts.publicSans(fontSize: 12, color: const Color(0xFF475569)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                ],
+                if (date != null) ...[
+                  const SizedBox(height: 2),
+                  Text('${date.day}/${date.month}/${date.year}',
+                      style: GoogleFonts.publicSans(fontSize: 11, color: Colors.grey)),
+                ],
+              ],
             ),
           ),
         ],

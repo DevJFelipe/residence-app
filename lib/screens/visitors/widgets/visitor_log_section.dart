@@ -30,22 +30,7 @@ class VisitorLogSection extends ConsumerWidget {
                 Text('Bitácora del Día', style: AppTextStyles.heading3),
               ],
             ),
-            Row(
-              children: [
-                SvgPicture.asset(
-                  'assets/icons/visitor_export.svg',
-                  width: 9.333,
-                  height: 9.333,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'Exportar',
-                  style: AppTextStyles.medium14.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
+            const SizedBox.shrink(),
           ],
         ),
         const SizedBox(height: 16),
@@ -203,20 +188,7 @@ class VisitorLogSection extends ConsumerWidget {
                     ],
                   ),
                 ),
-                // Footer
-                Container(
-                  width: double.infinity,
-                  color: AppColors.surfaceLight,
-                  padding: const EdgeInsets.all(16),
-                  child: Center(
-                    child: Text(
-                      'Ver registro completo',
-                      style: AppTextStyles.bold12.copyWith(
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                ),
+                const SizedBox.shrink(),
               ],
             ),
           ),

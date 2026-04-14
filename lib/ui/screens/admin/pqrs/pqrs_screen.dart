@@ -1,7 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:residence_app/core/theme/app_colors.dart';
 import 'package:residence_app/core/theme/app_text_styles.dart';
+import 'package:residence_app/services/pqrs_service.dart';
 
 class PqrsScreen extends StatefulWidget {
   const PqrsScreen({super.key});
@@ -11,73 +13,85 @@ class PqrsScreen extends StatefulWidget {
 }
 
 class _PqrsScreenState extends State<PqrsScreen> {
-  int _activeFilter = 0;
+  final _service = PqrsService();
+  List<Map<String, dynamic>> _pqrs = [];
+  List<Map<String, dynamic>> _statuses = [];
+  bool _loading = true;
+  String? _error;
 
-  static const _filterLabels = [
-    'Todas',
-    'Peticiones',
-    'Quejas',
-    'Reclamos',
-    'Sugerencias',
-  ];
+  // null = todas, else status id
+  int? _statusFilter;
 
-  // Mock PQRS data
-  static final _pqrsItems = [
-    _PqrsItem(
-      type: 'Petición',
-      subject: 'Solicitud de parqueadero adicional',
-      unit: 'Apto 301 - Torre 2',
-      resident: 'María González',
-      time: 'Hace 2 horas',
-      status: 'Abierto',
-      priority: 'high',
-    ),
-    _PqrsItem(
-      type: 'Queja',
-      subject: 'Ruido excesivo en horario nocturno',
-      unit: 'Apto 502 - Torre 1',
-      resident: 'Carlos Ramírez',
-      time: 'Hace 4 horas',
-      status: 'En Proceso',
-      priority: 'high',
-    ),
-    _PqrsItem(
-      type: 'Reclamo',
-      subject: 'Cobro duplicado en cuota de marzo',
-      unit: 'Apto 203 - Torre 3',
-      resident: 'Ana Martínez',
-      time: 'Hace 6 horas',
-      status: 'Abierto',
-      priority: 'medium',
-    ),
-    _PqrsItem(
-      type: 'Sugerencia',
-      subject: 'Instalación de cámaras en parqueadero',
-      unit: 'Apto 401 - Torre 2',
-      resident: 'Luis Hernández',
-      time: 'Hace 1 día',
-      status: 'En Proceso',
-      priority: 'low',
-    ),
-    _PqrsItem(
-      type: 'Petición',
-      subject: 'Permiso para remodelación interior',
-      unit: 'Apto 102 - Torre 1',
-      resident: 'Sandra López',
-      time: 'Hace 2 días',
-      status: 'Resuelto',
-      priority: 'medium',
-    ),
-    _PqrsItem(
-      type: 'Queja',
-      subject: 'Filtración de agua en techo',
-      unit: 'Apto 601 - Torre 3',
-      resident: 'Pedro Vargas',
-      time: 'Hace 3 días',
-      status: 'Cerrado',
-      priority: 'high',
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadAll();
+  }
+
+  Future<void> _loadAll() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final results = await Future.wait([
+        _service.getPqrs(statusId: _statusFilter),
+        if (_statuses.isEmpty) _service.getPqrStatuses(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _pqrs = results[0];
+        if (_statuses.isEmpty && results.length > 1) {
+          _statuses = results[1];
+        }
+        _loading = false;
+      });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = PqrsService.parseError(e);
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Error al cargar PQRS';
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _reload() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final pqrs = await _service.getPqrs(statusId: _statusFilter);
+      if (!mounted) return;
+      setState(() {
+        _pqrs = pqrs;
+        _loading = false;
+      });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = PqrsService.parseError(e);
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Error al cargar PQRS';
+        _loading = false;
+      });
+    }
+  }
+
+  void _onStatusChanged(int? statusId) {
+    setState(() => _statusFilter = statusId);
+    _reload();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,21 +99,37 @@ class _PqrsScreenState extends State<PqrsScreen> {
       children: [
         _buildHeader(context),
         Expanded(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildStatCards(),
-                  const SizedBox(height: 24),
-                  _buildFilterTabs(),
-                  const SizedBox(height: 16),
-                  _buildPqrsList(),
-                ],
-              ),
-            ),
-          ),
+          child: _loading
+              ? const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary))
+              : _error != null
+                  ? _buildError()
+                  : RefreshIndicator(
+                      onRefresh: _reload,
+                      color: AppColors.primary,
+                      child: Column(
+                        children: [
+                          _buildStatusTabs(),
+                          _buildCountBadge(),
+                          Expanded(
+                            child: _pqrs.isEmpty
+                                ? Center(
+                                    child: Text('No hay PQRS',
+                                        style: GoogleFonts.publicSans(
+                                            color: Colors.grey)))
+                                : ListView.separated(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        16, 8, 16, 24),
+                                    itemCount: _pqrs.length,
+                                    separatorBuilder: (_, __) =>
+                                        const SizedBox(height: 10),
+                                    itemBuilder: (_, i) =>
+                                        _buildPqrsCard(_pqrs[i]),
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ),
         ),
       ],
     );
@@ -115,199 +145,196 @@ class _PqrsScreenState extends State<PqrsScreen> {
       child: SizedBox(
         height: 64,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'PQRS',
-                style: GoogleFonts.publicSans(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  height: 28 / 20,
-                  letterSpacing: -0.5,
-                  color: AppColors.textDark,
-                ),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'PQRS',
+              style: GoogleFonts.publicSans(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.5,
+                color: AppColors.textDark,
               ),
-              GestureDetector(
-                onTap: () {},
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.borderLight,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.search_rounded,
-                    size: 20,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildStatCards() {
-    return GridView.count(
-      crossAxisCount: 2,
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.6,
-      children: [
-        _StatCard(label: 'Total', value: '24', color: AppColors.primary),
-        _StatCard(label: 'Abiertas', value: '8', color: AppColors.error),
-        _StatCard(label: 'En Proceso', value: '6', color: AppColors.warning),
-        _StatCard(label: 'Resueltas', value: '10', color: AppColors.success),
-      ],
-    );
-  }
-
-  Widget _buildFilterTabs() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: List.generate(_filterLabels.length, (index) {
-          final isActive = index == _activeFilter;
-          return Padding(
-            padding: EdgeInsets.only(right: index < _filterLabels.length - 1 ? 8 : 0),
-            child: GestureDetector(
-              onTap: () => setState(() => _activeFilter = index),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isActive ? AppColors.primary : AppColors.cardBackground,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isActive ? AppColors.primary : AppColors.divider,
-                  ),
-                ),
-                child: Text(
-                  _filterLabels[index],
-                  style: GoogleFonts.publicSans(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: isActive ? Colors.white : AppColors.textSecondary,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-
-  Widget _buildPqrsList() {
-    final filtered = _activeFilter == 0
-        ? _pqrsItems
-        : _pqrsItems.where((item) {
-            switch (_activeFilter) {
-              case 1:
-                return item.type == 'Petición';
-              case 2:
-                return item.type == 'Queja';
-              case 3:
-                return item.type == 'Reclamo';
-              case 4:
-                return item.type == 'Sugerencia';
-              default:
-                return true;
-            }
-          }).toList();
-
-    return Column(
-      children: filtered.map((item) => _buildPqrsCard(item)).toList(),
-    );
-  }
-
-  Widget _buildPqrsCard(_PqrsItem item) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderLight),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0D000000),
-            blurRadius: 2,
-            offset: Offset(0, 1),
-          ),
-        ],
-      ),
+  Widget _buildError() {
+    return Center(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Top row: type badge + priority dot
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _typeColor(item.type).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  item.type,
-                  style: GoogleFonts.publicSans(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: _typeColor(item.type),
-                  ),
-                ),
-              ),
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: _priorityColor(item.priority),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildStatusBadge(item.status),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          // Subject
-          Text(
-            item.subject,
-            style: AppTextStyles.semiBold14,
-          ),
-          const SizedBox(height: 6),
-          // Unit + Resident
-          Text(
-            '${item.unit} \u2022 ${item.resident}',
-            style: AppTextStyles.bodySmall,
-          ),
-          const SizedBox(height: 4),
-          // Date
-          Text(
-            item.time,
-            style: GoogleFonts.publicSans(
-              fontSize: 11,
-              fontWeight: FontWeight.w400,
-              color: AppColors.textSecondary,
-            ),
+          Text(_error!, style: AppTextStyles.bodyLarge),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _loadAll,
+            style:
+                ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child:
+                const Text('Reintentar', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatusBadge(String status) {
+  Widget _buildStatusTabs() {
+    return Container(
+      color: AppColors.cardBackground,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _tabChip('Todas', null),
+            ..._statuses.map((s) => _tabChip(
+                  s['name']?.toString() ?? '',
+                  s['id'] as int,
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _tabChip(String label, int? statusId) {
+    final isActive = _statusFilter == statusId;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: GestureDetector(
+        onTap: () => _onStatusChanged(statusId),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: isActive ? AppColors.primary : AppColors.surfaceLight,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            label,
+            style: GoogleFonts.publicSans(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: isActive ? Colors.white : AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCountBadge() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          '${_pqrs.length} resultado${_pqrs.length == 1 ? '' : 's'}',
+          style: GoogleFonts.publicSans(
+              fontSize: 12, color: AppColors.textSecondary),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPqrsCard(Map<String, dynamic> pqr) {
+    final subject = pqr['subject'] ?? '';
+    final description = pqr['description'] ?? '';
+    final typeName = pqr['pqr_type_name'] ?? '';
+    final statusName = pqr['pqr_status_name'] ?? '';
+    final priorityName = (pqr['priority_name'] ?? '').toString().toLowerCase();
+    final reporterName = pqr['reporter_name'] ?? '';
+    final createdAt = pqr['created_at'] != null
+        ? DateTime.tryParse(pqr['created_at'])
+        : null;
+
+    return GestureDetector(
+      onTap: () => _showDetail(pqr),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.cardBackground,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.borderLight),
+          boxShadow: const [
+            BoxShadow(
+                color: Color(0x0D000000),
+                blurRadius: 2,
+                offset: Offset(0, 1)),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top: type badge + priority + status
+            Row(
+              children: [
+                _typeBadge(typeName),
+                const Spacer(),
+                Container(
+                  width: 8,
+                  height: 8,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: _priorityColor(priorityName),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                _statusBadge(statusName),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(subject, style: AppTextStyles.semiBold14),
+            if (description.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(description,
+                  style: GoogleFonts.publicSans(
+                      fontSize: 12, color: const Color(0xFF475569)),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis),
+            ],
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (reporterName.isNotEmpty)
+                  Text(reporterName,
+                      style: GoogleFonts.publicSans(
+                          fontSize: 11, color: AppColors.textSecondary)),
+                if (reporterName.isNotEmpty && createdAt != null)
+                  Text(' · ',
+                      style: TextStyle(
+                          fontSize: 11, color: AppColors.textSecondary)),
+                if (createdAt != null)
+                  Text(
+                      '${createdAt.day}/${createdAt.month}/${createdAt.year}',
+                      style: GoogleFonts.publicSans(
+                          fontSize: 11, color: AppColors.textSecondary)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _typeBadge(String type) {
+    final color = _typeColor(type);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(type,
+          style: GoogleFonts.publicSans(
+              fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+    );
+  }
+
+  Widget _statusBadge(String status) {
     final color = _statusColor(status);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -315,128 +342,684 @@ class _PqrsScreenState extends State<PqrsScreen> {
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Text(
-        status,
-        style: GoogleFonts.publicSans(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: color,
+      child: Text(status,
+          style: GoogleFonts.publicSans(
+              fontSize: 10, fontWeight: FontWeight.w700, color: color)),
+    );
+  }
+
+  void _showDetail(Map<String, dynamic> pqr) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _PqrDetailPage(
+          pqr: pqr,
+          service: _service,
+          statuses: _statuses,
+          onUpdated: _reload,
         ),
       ),
     );
   }
 
   Color _typeColor(String type) {
-    switch (type) {
-      case 'Petición':
-        return AppColors.info;
-      case 'Queja':
-        return AppColors.error;
-      case 'Reclamo':
-        return AppColors.warning;
-      case 'Sugerencia':
-        return AppColors.success;
-      default:
-        return AppColors.textSecondary;
-    }
+    final t = type.toLowerCase();
+    if (t.contains('petici')) return AppColors.info;
+    if (t.contains('queja')) return AppColors.error;
+    if (t.contains('reclamo')) return AppColors.warning;
+    if (t.contains('sugerencia')) return AppColors.success;
+    return AppColors.textSecondary;
   }
 
   Color _statusColor(String status) {
-    switch (status) {
-      case 'Abierto':
-        return AppColors.error;
-      case 'En Proceso':
-        return AppColors.warning;
-      case 'Resuelto':
-        return AppColors.success;
-      case 'Cerrado':
-        return AppColors.textSecondary;
-      default:
-        return AppColors.textSecondary;
-    }
+    final s = status.toLowerCase();
+    if (s.contains('abierto')) return AppColors.error;
+    if (s.contains('proceso')) return AppColors.warning;
+    if (s.contains('resuelto')) return AppColors.success;
+    if (s.contains('cerrado')) return AppColors.textSecondary;
+    return AppColors.textSecondary;
   }
 
   Color _priorityColor(String priority) {
-    switch (priority) {
-      case 'high':
-        return AppColors.error;
-      case 'medium':
-        return AppColors.warning;
-      case 'low':
-        return AppColors.success;
-      default:
-        return AppColors.textSecondary;
-    }
+    if (priority.contains('alt')) return AppColors.error;
+    if (priority.contains('medi')) return AppColors.warning;
+    if (priority.contains('baj')) return AppColors.success;
+    return AppColors.textSecondary;
   }
 }
 
-class _StatCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
+// ─── Admin PQR Detail Page ─────────────────────────────────────────────
 
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.color,
+class _PqrDetailPage extends StatefulWidget {
+  final Map<String, dynamic> pqr;
+  final PqrsService service;
+  final List<Map<String, dynamic>> statuses;
+  final VoidCallback onUpdated;
+
+  const _PqrDetailPage({
+    required this.pqr,
+    required this.service,
+    required this.statuses,
+    required this.onUpdated,
   });
 
   @override
+  State<_PqrDetailPage> createState() => _PqrDetailPageState();
+}
+
+class _PqrDetailPageState extends State<_PqrDetailPage> {
+  late Map<String, dynamic> _pqr;
+  List<Map<String, dynamic>> _comments = [];
+  List<Map<String, dynamic>> _priorities = [];
+  bool _loadingComments = true;
+  bool _submitting = false;
+  final _commentCtrl = TextEditingController();
+  final _resolutionCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _pqr = Map.from(widget.pqr);
+    _resolutionCtrl.text = _pqr['resolution']?.toString() ?? '';
+    _loadExtras();
+  }
+
+  @override
+  void dispose() {
+    _commentCtrl.dispose();
+    _resolutionCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadExtras() async {
+    final pqrId = _pqr['id'].toString();
+    try {
+      final results = await Future.wait([
+        widget.service.getComments(pqrId),
+        widget.service.getPriorities(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _comments = results[0];
+        _priorities = results[1];
+        _loadingComments = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingComments = false);
+    }
+  }
+
+  Future<void> _updateStatus(int statusId) async {
+    setState(() => _submitting = true);
+    try {
+      final updated = await widget.service.updatePqr(
+        _pqr['id'].toString(),
+        pqrStatusId: statusId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _pqr = updated;
+        _submitting = false;
+      });
+      widget.onUpdated();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al actualizar estado: $e')),
+      );
+    }
+  }
+
+  Future<void> _updatePriority(int priorityId) async {
+    setState(() => _submitting = true);
+    try {
+      final updated = await widget.service.updatePqr(
+        _pqr['id'].toString(),
+        priorityId: priorityId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _pqr = updated;
+        _submitting = false;
+      });
+      widget.onUpdated();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al actualizar prioridad: $e')),
+      );
+    }
+  }
+
+  Future<void> _saveResolution() async {
+    final text = _resolutionCtrl.text.trim();
+    if (text.isEmpty) return;
+    setState(() => _submitting = true);
+    try {
+      final updated = await widget.service.updatePqr(
+        _pqr['id'].toString(),
+        resolution: text,
+      );
+      if (!mounted) return;
+      setState(() {
+        _pqr = updated;
+        _submitting = false;
+      });
+      widget.onUpdated();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Resolución guardada')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
+  Future<void> _addComment() async {
+    final text = _commentCtrl.text.trim();
+    if (text.isEmpty) return;
+    setState(() => _submitting = true);
+    try {
+      await widget.service.addComment(_pqr['id'].toString(), text);
+      _commentCtrl.clear();
+      final comments =
+          await widget.service.getComments(_pqr['id'].toString());
+      if (!mounted) return;
+      setState(() {
+        _comments = comments;
+        _submitting = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al agregar comentario: $e')),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderLight),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0D000000),
-            blurRadius: 2,
-            offset: Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
+    final statusName = _pqr['pqr_status_name']?.toString() ?? '';
+    final typeName = _pqr['pqr_type_name']?.toString() ?? '';
+    final priorityName =
+        (_pqr['priority_name'] ?? '').toString().toLowerCase();
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: Column(
         children: [
-          Text(
-            value,
-            style: GoogleFonts.publicSans(
-              fontSize: 28,
-              fontWeight: FontWeight.w700,
-              height: 1.2,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: AppTextStyles.bodySmall,
+          _buildHeader(),
+          Expanded(
+            child: _submitting
+                ? const Center(
+                    child:
+                        CircularProgressIndicator(color: AppColors.primary))
+                : ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                    children: [
+                      // Status & type badges
+                      Row(
+                        children: [
+                          _badge(typeName, _typeColor(typeName)),
+                          const SizedBox(width: 8),
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: _priorityColor(priorityName),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _pqr['priority_name']?.toString() ?? '',
+                            style: GoogleFonts.publicSans(
+                                fontSize: 12,
+                                color: AppColors.textSecondary),
+                          ),
+                          const Spacer(),
+                          _badge(statusName, _statusColor(statusName)),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Subject & description
+                      Text(
+                        _pqr['subject']?.toString() ?? '',
+                        style: GoogleFonts.publicSans(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textDark,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _pqr['description']?.toString() ?? '',
+                        style: GoogleFonts.publicSans(
+                          fontSize: 14,
+                          height: 1.5,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Meta
+                      _metaRow('Reportado por',
+                          _pqr['reporter_name']?.toString() ?? ''),
+                      _metaRow(
+                          'Fecha', _formatDate(_pqr['created_at']?.toString())),
+                      if ((_pqr['assignee_name'] ?? '').toString().isNotEmpty)
+                        _metaRow('Asignado a',
+                            _pqr['assignee_name'].toString()),
+
+                      const SizedBox(height: 20),
+                      const Divider(color: AppColors.divider),
+                      const SizedBox(height: 12),
+
+                      // ─── Admin actions ───
+                      Text('Gestionar',
+                          style: GoogleFonts.publicSans(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textDark)),
+                      const SizedBox(height: 14),
+
+                      // Change status
+                      _actionLabel('Cambiar estado'),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: widget.statuses.map((s) {
+                          final sid = s['id'] as int;
+                          final sname = s['name']?.toString() ?? '';
+                          final isActive =
+                              sid == _pqr['pqr_status_id'];
+                          final color = _statusColor(sname);
+                          return GestureDetector(
+                            onTap:
+                                isActive ? null : () => _updateStatus(sid),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isActive
+                                    ? color.withValues(alpha: 0.15)
+                                    : AppColors.surfaceLight,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                    color: isActive
+                                        ? color
+                                        : AppColors.borderLight),
+                              ),
+                              child: Text(
+                                sname,
+                                style: GoogleFonts.publicSans(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: isActive
+                                      ? color
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Change priority
+                      if (_priorities.isNotEmpty) ...[
+                        _actionLabel('Cambiar prioridad'),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _priorities.map((p) {
+                            final pid = p['id'] as int;
+                            final pname = p['name']?.toString() ?? '';
+                            final isActive =
+                                pid == _pqr['priority_id'];
+                            final color =
+                                _priorityColor(pname.toLowerCase());
+                            return GestureDetector(
+                              onTap: isActive
+                                  ? null
+                                  : () => _updatePriority(pid),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isActive
+                                      ? color.withValues(alpha: 0.15)
+                                      : AppColors.surfaceLight,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                      color: isActive
+                                          ? color
+                                          : AppColors.borderLight),
+                                ),
+                                child: Text(
+                                  pname,
+                                  style: GoogleFonts.publicSans(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: isActive
+                                        ? color
+                                        : AppColors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // Resolution
+                      _actionLabel('Resolución'),
+                      const SizedBox(height: 6),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceLight,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.borderLight),
+                        ),
+                        child: TextField(
+                          controller: _resolutionCtrl,
+                          maxLines: 3,
+                          style: GoogleFonts.publicSans(
+                              fontSize: 14, color: AppColors.textDark),
+                          decoration: InputDecoration(
+                            hintText: 'Escribir resolución...',
+                            hintStyle: GoogleFonts.publicSans(
+                                fontSize: 14,
+                                color: AppColors.textSecondary),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.all(12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: GestureDetector(
+                          onTap: _saveResolution,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text('Guardar resolución',
+                                style: GoogleFonts.publicSans(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white)),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+                      const Divider(color: AppColors.divider),
+                      const SizedBox(height: 12),
+
+                      // ─── Comments ───
+                      Text('Comentarios',
+                          style: GoogleFonts.publicSans(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textDark)),
+                      const SizedBox(height: 12),
+
+                      if (_loadingComments)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                                color: AppColors.primary),
+                          ),
+                        )
+                      else ...[
+                        if (_comments.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Text('Sin comentarios',
+                                style: GoogleFonts.publicSans(
+                                    fontSize: 13,
+                                    color: AppColors.textSecondary)),
+                          ),
+                        ..._comments.map(_buildCommentCard),
+                      ],
+
+                      const SizedBox(height: 12),
+                      // Add comment
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceLight,
+                                borderRadius: BorderRadius.circular(8),
+                                border:
+                                    Border.all(color: AppColors.borderLight),
+                              ),
+                              child: TextField(
+                                controller: _commentCtrl,
+                                style: GoogleFonts.publicSans(
+                                    fontSize: 14,
+                                    color: AppColors.textDark),
+                                decoration: InputDecoration(
+                                  hintText: 'Agregar comentario...',
+                                  hintStyle: GoogleFonts.publicSans(
+                                      fontSize: 14,
+                                      color: AppColors.textSecondary),
+                                  border: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 12),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: _addComment,
+                            child: Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.send_rounded,
+                                  color: Colors.white, size: 20),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
           ),
         ],
       ),
     );
   }
-}
 
-class _PqrsItem {
-  final String type;
-  final String subject;
-  final String unit;
-  final String resident;
-  final String time;
-  final String status;
-  final String priority;
+  Widget _buildHeader() {
+    return Container(
+      padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
+      decoration: const BoxDecoration(
+        color: AppColors.cardBackground,
+        border: Border(bottom: BorderSide(color: AppColors.divider)),
+      ),
+      child: SizedBox(
+        height: 64,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                behavior: HitTestBehavior.opaque,
+                child: const Icon(Icons.arrow_back_rounded,
+                    size: 24, color: AppColors.textDark),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Detalle PQRS',
+                style: GoogleFonts.publicSans(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.5,
+                  color: AppColors.textDark,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-  const _PqrsItem({
-    required this.type,
-    required this.subject,
-    required this.unit,
-    required this.resident,
-    required this.time,
-    required this.status,
-    required this.priority,
-  });
+  Widget _buildCommentCard(Map<String, dynamic> comment) {
+    final userName = comment['user_name']?.toString() ?? 'Usuario';
+    final text = comment['comment']?.toString() ?? '';
+    final date = _formatDate(comment['created_at']?.toString());
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(
+                  child: Text(
+                    userName.isNotEmpty ? userName[0].toUpperCase() : '?',
+                    style: GoogleFonts.publicSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(userName,
+                    style: GoogleFonts.publicSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textDark)),
+              ),
+              Text(date,
+                  style: GoogleFonts.publicSans(
+                      fontSize: 11, color: AppColors.textSecondary)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(text,
+              style: GoogleFonts.publicSans(
+                  fontSize: 13, height: 1.4, color: AppColors.textSecondary)),
+        ],
+      ),
+    );
+  }
+
+  Widget _badge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(label,
+          style: GoogleFonts.publicSans(
+              fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+    );
+  }
+
+  Widget _metaRow(String label, String value) {
+    if (value.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Text('$label: ',
+              style: GoogleFonts.publicSans(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary)),
+          Expanded(
+            child: Text(value,
+                style: GoogleFonts.publicSans(
+                    fontSize: 12, color: AppColors.textDark)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _actionLabel(String text) {
+    return Text(text,
+        style: GoogleFonts.publicSans(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary));
+  }
+
+  String _formatDate(String? iso) {
+    if (iso == null) return '';
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      return '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  Color _typeColor(String type) {
+    final t = type.toLowerCase();
+    if (t.contains('petici')) return AppColors.info;
+    if (t.contains('queja')) return AppColors.error;
+    if (t.contains('reclamo')) return AppColors.warning;
+    if (t.contains('sugerencia')) return AppColors.success;
+    return AppColors.textSecondary;
+  }
+
+  Color _statusColor(String status) {
+    final s = status.toLowerCase();
+    if (s.contains('abierto')) return AppColors.error;
+    if (s.contains('proceso')) return AppColors.warning;
+    if (s.contains('resuelto')) return AppColors.success;
+    if (s.contains('cerrado')) return AppColors.textSecondary;
+    return AppColors.textSecondary;
+  }
+
+  Color _priorityColor(String priority) {
+    if (priority.contains('alt')) return AppColors.error;
+    if (priority.contains('medi')) return AppColors.warning;
+    if (priority.contains('baj')) return AppColors.success;
+    return AppColors.textSecondary;
+  }
 }

@@ -97,4 +97,12 @@ class MockVisitorDatasource implements VisitorRepository {
     await Future.delayed(const Duration(milliseconds: 500));
     _activeVisitors.removeWhere((v) => v['id'] == visitorId);
   }
+
+  @override
+  Future<List<Map<String, dynamic>>> getPendingVisitors() async {
+    return [];
+  }
+
+  @override
+  Future<void> confirmEntry(String visitorId) async {}
 }

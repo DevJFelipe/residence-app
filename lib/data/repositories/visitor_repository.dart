@@ -16,4 +16,10 @@ abstract class VisitorRepository {
 
   /// Registers a visitor exit by visitor ID.
   Future<void> registerExit(String visitorId);
+
+  /// Returns pre-registered visitors (pending confirmation).
+  Future<List<Map<String, dynamic>>> getPendingVisitors();
+
+  /// Confirms a pre-registered visitor's entry.
+  Future<void> confirmEntry(String visitorId);
 }

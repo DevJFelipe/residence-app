@@ -36,6 +36,10 @@ class _ReservationScreenState extends State<ReservationScreen> {
   // User's property for booking
   UserProperty? _userProperty;
 
+  // Existing bookings for the selected date (to mark occupied slots)
+  List<Booking> _existingBookings = [];
+  bool _loadingSlots = false;
+
   final _dayHeaders = ['DOM', 'LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB'];
 
   // Generate time slots based on amenity availability
@@ -82,6 +86,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
     super.initState();
     _currentMonth = DateTime(_selectedDate.year, _selectedDate.month);
     _loadUserProperty();
+    _loadBookingsForDate();
   }
 
   Future<void> _loadUserProperty() async {
@@ -92,6 +97,45 @@ class _ReservationScreenState extends State<ReservationScreen> {
         setState(() => _userProperty = user.properties.first);
       }
     }
+  }
+
+  Future<void> _loadBookingsForDate() async {
+    setState(() => _loadingSlots = true);
+    try {
+      final bookings = await _service.getBookings(
+        amenityId: widget.amenity.id,
+      );
+      if (!mounted) return;
+      // Filter bookings for the selected date that are active (pendiente=1, aprobada=2)
+      final dateBookings = bookings.where((b) {
+        final sameDay = b.startTime.year == _selectedDate.year &&
+            b.startTime.month == _selectedDate.month &&
+            b.startTime.day == _selectedDate.day;
+        return sameDay && (b.bookingStatusId == 1 || b.bookingStatusId == 2);
+      }).toList();
+      setState(() {
+        _existingBookings = dateBookings;
+        _loadingSlots = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingSlots = false);
+    }
+  }
+
+  bool _isSlotOccupied(int startHour, int endHour) {
+    final slotStart = DateTime(
+      _selectedDate.year, _selectedDate.month, _selectedDate.day, startHour,
+    );
+    final slotEnd = DateTime(
+      _selectedDate.year, _selectedDate.month, _selectedDate.day, endHour,
+    );
+    for (final b in _existingBookings) {
+      if (b.startTime.isBefore(slotEnd) && b.endTime.isAfter(slotStart)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   List<List<int?>> _buildCalendarGrid() {
@@ -468,13 +512,17 @@ class _ReservationScreenState extends State<ReservationScreen> {
                             child: GestureDetector(
                               onTap: isPast
                                   ? null
-                                  : () => setState(() {
+                                  : () {
+                                      setState(() {
                                         _selectedDate = DateTime(
                                           _currentMonth.year,
                                           _currentMonth.month,
                                           day,
                                         );
-                                      }),
+                                        _selectedTimeSlot = -1;
+                                      });
+                                      _loadBookingsForDate();
+                                    },
                               child: Center(
                                 child: Container(
                                   width: 40,
@@ -548,64 +596,91 @@ class _ReservationScreenState extends State<ReservationScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          ...List.generate(slots.length, (index) {
-            final slot = slots[index];
-            final isSelected = _selectedTimeSlot == index;
-            return Padding(
-              padding: EdgeInsets.only(bottom: index < slots.length - 1 ? 12 : 0),
-              child: GestureDetector(
-                onTap: () => setState(() => _selectedTimeSlot = index),
-                child: Container(
-                  height: 76,
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  decoration: BoxDecoration(
-                    color: isSelected ? _accent.withValues(alpha: 0.05) : Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isSelected ? _accent : Colors.transparent,
-                      width: 2,
-                    ),
-                    boxShadow: isSelected
-                        ? null
-                        : const [
-                            BoxShadow(color: Color(0x0D000000), blurRadius: 2, offset: Offset(0, 1)),
-                          ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
+          if (_loadingSlots)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: SizedBox(
+                width: 20, height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )),
+            )
+          else
+            ...List.generate(slots.length, (index) {
+              final slot = slots[index];
+              final startH = int.parse(slot['start']!);
+              final endH = int.parse(slot['end']!);
+              final isOccupied = _isSlotOccupied(startH, endH);
+              final isSelected = _selectedTimeSlot == index;
+              return Padding(
+                padding: EdgeInsets.only(bottom: index < slots.length - 1 ? 12 : 0),
+                child: GestureDetector(
+                  onTap: isOccupied ? null : () => setState(() => _selectedTimeSlot = index),
+                  child: Opacity(
+                    opacity: isOccupied ? 0.5 : 1.0,
+                    child: Container(
+                      height: 76,
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
+                      decoration: BoxDecoration(
+                        color: isOccupied
+                            ? const Color(0xFFF1F5F9)
+                            : isSelected
+                                ? _accent.withValues(alpha: 0.05)
+                                : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isOccupied
+                              ? const Color(0xFFE2E8F0)
+                              : isSelected ? _accent : Colors.transparent,
+                          width: 2,
+                        ),
+                        boxShadow: isSelected || isOccupied
+                            ? null
+                            : const [
+                                BoxShadow(color: Color(0x0D000000), blurRadius: 2, offset: Offset(0, 1)),
+                              ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            slot['time']!,
-                            style: GoogleFonts.publicSans(
-                              fontSize: 16, fontWeight: FontWeight.w700, height: 24 / 16, color: _dark,
-                            ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                slot['time']!,
+                                style: GoogleFonts.publicSans(
+                                  fontSize: 16, fontWeight: FontWeight.w700, height: 24 / 16,
+                                  color: isOccupied ? const Color(0xFF94A3B8) : _dark,
+                                ),
+                              ),
+                              Text(
+                                isOccupied ? 'Ocupado' : slot['label']!,
+                                style: GoogleFonts.publicSans(
+                                  fontSize: 12, fontWeight: FontWeight.w500, height: 16 / 12,
+                                  color: isOccupied
+                                      ? const Color(0xFFEF4444)
+                                      : isSelected ? _accent : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
                           ),
-                          Text(
-                            slot['label']!,
-                            style: GoogleFonts.publicSans(
-                              fontSize: 12, fontWeight: FontWeight.w500, height: 16 / 12,
-                              color: isSelected ? _accent : const Color(0xFF64748B),
+                          if (isOccupied)
+                            const Icon(Icons.block_rounded, size: 20, color: Color(0xFFEF4444))
+                          else
+                            SvgPicture.asset(
+                              isSelected
+                                  ? 'assets/icons/reserv_check.svg'
+                                  : 'assets/icons/reserv_circle.svg',
+                              width: 20,
+                              height: 20,
                             ),
-                          ),
                         ],
                       ),
-                      SvgPicture.asset(
-                        isSelected
-                            ? 'assets/icons/reserv_check.svg'
-                            : 'assets/icons/reserv_circle.svg',
-                        width: 20,
-                        height: 20,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          }),
+              );
+            }),
         ],
       ),
     );

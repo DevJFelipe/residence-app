@@ -9,9 +9,6 @@ import 'package:residence_app/screens/admin_shell.dart';
 import 'package:residence_app/screens/user_shell.dart';
 import 'package:residence_app/screens/profile/condo_profile_screen.dart';
 import 'package:residence_app/screens/profile/visitor_preregister_screen.dart';
-import 'package:residence_app/screens/amenities/reservation_screen.dart';
-import 'package:residence_app/screens/amenities/confirmation_screen.dart';
-
 import 'route_names.dart';
 
 /// A [ChangeNotifier] that wraps the auth state so GoRouter can listen to it.
@@ -82,15 +79,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const UserShell(),
       ),
 
-      // ── User nested routes ──
-      GoRoute(
-        path: RouteNames.userReserve,
-        builder: (context, state) => const ReservationScreen(),
-      ),
-      GoRoute(
-        path: RouteNames.userConfirmation,
-        builder: (context, state) => const ConfirmationScreen(),
-      ),
+      // Reservation and Confirmation screens are navigated via Navigator.push
+      // with required parameters (amenity, booking), not via GoRouter.
     ],
   );
 });

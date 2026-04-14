@@ -23,3 +23,9 @@ final occupancyProvider =
   final repo = ref.read(visitorRepositoryProvider);
   return repo.getOccupancy();
 });
+
+final pendingVisitorsProvider =
+    FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
+  final repo = ref.read(visitorRepositoryProvider);
+  return repo.getPendingVisitors();
+});

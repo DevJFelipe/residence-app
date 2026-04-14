@@ -37,7 +37,7 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
       _error = null;
     });
     try {
-      final bookings = await _service.getBookings();
+      final bookings = await _service.getMyBookings();
       if (!mounted) return;
       setState(() {
         _bookings = bookings;
@@ -139,7 +139,7 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
                               padding:
                                   const EdgeInsets.fromLTRB(16, 16, 16, 49),
                               itemCount: filtered.length,
-                              separatorBuilder: (_, __) =>
+                              separatorBuilder: (context, index) =>
                                   const SizedBox(height: 16),
                               itemBuilder: (context, index) =>
                                   _buildCard(filtered[index]),
@@ -186,14 +186,8 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
                     ),
                   ),
                 ),
-                if (!widget.embedded)
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: SvgPicture.asset('assets/icons/myres_search.svg',
-                        width: 18, height: 18),
-                  )
-                else
-                  const SizedBox(width: 32),
+                // Spacer to balance the back button on the left
+                const SizedBox(width: 32),
               ],
             ),
             const SizedBox(height: 16),
@@ -452,6 +446,23 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
                   _detailRow(Icons.note_outlined, 'Notas: ${booking.notes}'),
                 ],
                 const SizedBox(height: 24),
+                if (booking.isUpcoming)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => _confirmCancel(ctx, booking),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFEF4444),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: Text('Cancelar reserva',
+                          style: GoogleFonts.dmSans(
+                              fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                if (booking.isUpcoming) const SizedBox(height: 8),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -469,6 +480,67 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  void _confirmCancel(BuildContext sheetCtx, Booking booking) {
+    showDialog(
+      context: sheetCtx,
+      builder: (ctx) => AlertDialog(
+        title: Text('Cancelar reserva',
+            style: GoogleFonts.publicSans(
+                fontWeight: FontWeight.w700, color: _dark)),
+        content: Text(
+          '¿Estás seguro de que deseas cancelar esta reserva?',
+          style: GoogleFonts.publicSans(color: const Color(0xFF64748B)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('No',
+                style: GoogleFonts.publicSans(color: const Color(0xFF64748B))),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop(); // close dialog
+              Navigator.of(sheetCtx).pop(); // close bottom sheet
+              try {
+                await _service.cancelBooking(booking.id);
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Reserva cancelada',
+                        style: GoogleFonts.publicSans(
+                            fontWeight: FontWeight.w500)),
+                    backgroundColor: const Color(0xFF10B981),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                );
+                _loadBookings();
+              } on DioException catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(AmenitiesService.parseError(e),
+                        style: GoogleFonts.publicSans(
+                            fontWeight: FontWeight.w500)),
+                    backgroundColor: const Color(0xFFEF4444),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                );
+              }
+            },
+            child: Text('Sí, cancelar',
+                style: GoogleFonts.publicSans(
+                    color: const Color(0xFFEF4444),
+                    fontWeight: FontWeight.w600)),
+          ),
+        ],
       ),
     );
   }

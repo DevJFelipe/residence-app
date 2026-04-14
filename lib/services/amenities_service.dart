@@ -36,6 +36,18 @@ class AmenitiesService {
     return Booking.fromJson(response.data['data']);
   }
 
+  Future<List<Booking>> getMyBookings({int? amenityId, int? statusId}) async {
+    final params = <String, dynamic>{};
+    if (amenityId != null) params['amenity_id'] = amenityId;
+    if (statusId != null) params['status_id'] = statusId;
+    final response = await _dio.get(
+      '/api/v1/amenities/bookings/me',
+      queryParameters: params,
+    );
+    final list = response.data['data'] as List;
+    return list.map((e) => Booking.fromJson(e)).toList();
+  }
+
   Future<List<Booking>> getBookings({int? amenityId, int? statusId}) async {
     final params = <String, dynamic>{};
     if (amenityId != null) params['amenity_id'] = amenityId;
@@ -46,6 +58,10 @@ class AmenitiesService {
     );
     final list = response.data['data'] as List;
     return list.map((e) => Booking.fromJson(e)).toList();
+  }
+
+  Future<void> cancelBooking(String bookingId) async {
+    await _dio.patch('/api/v1/amenities/bookings/$bookingId/cancel');
   }
 
   static String parseError(DioException e) {

@@ -1,11 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:residence_app/core/session_manager.dart';
 import 'package:residence_app/core/theme/app_colors.dart';
 import 'package:residence_app/core/theme/app_text_styles.dart';
+import 'package:residence_app/screens/admin/admin_profile_screen.dart';
+import 'package:residence_app/screens/admin/announcements_screen.dart';
+import 'package:residence_app/screens/admin/condo_info_screen.dart';
+import 'package:residence_app/screens/admin/notifications_screen.dart';
+import 'package:residence_app/screens/amenities/amenities_screen.dart';
 import 'package:residence_app/screens/login/login_screen.dart';
+import 'package:residence_app/screens/visitors/visitors_screen.dart';
 
-class MoreScreen extends StatelessWidget {
+class MoreScreen extends StatefulWidget {
   const MoreScreen({super.key});
+
+  @override
+  State<MoreScreen> createState() => _MoreScreenState();
+}
+
+class _MoreScreenState extends State<MoreScreen> {
+  String _userName = 'Administrador';
+  String _userEmail = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUser();
+  }
+
+  Future<void> _loadUser() async {
+    final user = await SessionManager().getUser();
+    if (!mounted || user == null) return;
+    setState(() {
+      _userName = (user['full_name'] ?? '${user['first_name'] ?? ''} ${user['last_name'] ?? ''}').toString().trim();
+      _userEmail = user['email'] ?? '';
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,29 +54,24 @@ class MoreScreen extends StatelessWidget {
                   const Divider(height: 1, color: AppColors.divider),
                   const SizedBox(height: 20),
                   _buildSection(context, 'Gestionar', [
-                    _MenuItem(Icons.apartment_rounded, 'Unidades'),
-                    _MenuItem(Icons.people_rounded, 'Residentes'),
-                    _MenuItem(Icons.pool_rounded, 'Áreas comunes'),
-                    _MenuItem(Icons.campaign_rounded, 'Anuncios'),
-                  ]),
-                  const SizedBox(height: 24),
-                  _buildSection(context, 'Reportes', [
-                    _MenuItem(Icons.bar_chart_rounded, 'Reporte de cartera'),
-                    _MenuItem(Icons.people_outline_rounded, 'Reporte de ocupación'),
-                    _MenuItem(Icons.assignment_rounded, 'Reporte de visitantes'),
-                    _MenuItem(Icons.description_rounded, 'Reporte de PQRS'),
+                    _MenuItem(Icons.people_alt_rounded, 'Visitantes',
+                        () => _push(context, const VisitorsScreen())),
+                    _MenuItem(Icons.pool_rounded, 'Áreas comunes',
+                        () => _push(context, const AmenitiesScreen())),
+                    _MenuItem(Icons.campaign_rounded, 'Anuncios',
+                        () => _push(context, const AnnouncementsScreen())),
                   ]),
                   const SizedBox(height: 24),
                   _buildSection(context, 'Configuración', [
-                    _MenuItem(Icons.settings_rounded, 'Datos del conjunto'),
-                    _MenuItem(Icons.schedule_rounded, 'Horarios'),
-                    _MenuItem(Icons.notifications_rounded, 'Notificaciones'),
-                    _MenuItem(Icons.security_rounded, 'Seguridad'),
+                    _MenuItem(Icons.settings_rounded, 'Datos del conjunto',
+                        () => _push(context, const CondoInfoScreen())),
+                    _MenuItem(Icons.notifications_rounded, 'Notificaciones',
+                        () => _push(context, const NotificationsScreen())),
                   ]),
                   const SizedBox(height: 24),
                   _buildSection(context, 'Cuenta', [
-                    _MenuItem(Icons.person_rounded, 'Mi perfil'),
-                    _MenuItem(Icons.help_rounded, 'Soporte'),
+                    _MenuItem(Icons.person_rounded, 'Mi perfil',
+                        () => _push(context, const AdminProfileScreen())),
                   ]),
                   const SizedBox(height: 32),
                   _buildLogoutButton(context),
@@ -57,6 +82,10 @@ class MoreScreen extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  void _push(BuildContext context, Widget screen) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
   }
 
   Widget _buildHeader(BuildContext context) {
@@ -89,6 +118,15 @@ class MoreScreen extends StatelessWidget {
   }
 
   Widget _buildProfileHeader() {
+    final initials = _userName.isNotEmpty
+        ? _userName
+            .split(' ')
+            .where((w) => w.isNotEmpty)
+            .take(2)
+            .map((w) => w[0].toUpperCase())
+            .join()
+        : 'AD';
+
     return Row(
       children: [
         Container(
@@ -100,7 +138,7 @@ class MoreScreen extends StatelessWidget {
           ),
           child: Center(
             child: Text(
-              'AD',
+              initials,
               style: GoogleFonts.publicSans(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
@@ -114,22 +152,24 @@ class MoreScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Administrador',
+              _userName,
               style: GoogleFonts.publicSans(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textDark,
               ),
             ),
-            const SizedBox(height: 2),
-            Text(
-              'admin@residence.com',
-              style: GoogleFonts.publicSans(
-                fontSize: 13,
-                fontWeight: FontWeight.w400,
-                color: AppColors.textSecondary,
+            if (_userEmail.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                _userEmail,
+                style: GoogleFonts.publicSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                  color: AppColors.textSecondary,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ],
@@ -186,19 +226,7 @@ class MoreScreen extends StatelessWidget {
 
   Widget _buildMenuRow(BuildContext context, _MenuItem item) {
     return GestureDetector(
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Próximamente',
-              style: GoogleFonts.publicSans(fontWeight: FontWeight.w500),
-            ),
-            duration: const Duration(seconds: 1),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-        );
-      },
+      onTap: item.onTap,
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -227,7 +255,9 @@ class MoreScreen extends StatelessWidget {
     return SizedBox(
       width: double.infinity,
       child: GestureDetector(
-        onTap: () {
+        onTap: () async {
+          await SessionManager().clear();
+          if (!context.mounted) return;
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (_) => const LoginScreen()),
             (route) => false,
@@ -270,5 +300,6 @@ class MoreScreen extends StatelessWidget {
 class _MenuItem {
   final IconData icon;
   final String title;
-  const _MenuItem(this.icon, this.title);
+  final VoidCallback onTap;
+  const _MenuItem(this.icon, this.title, this.onTap);
 }

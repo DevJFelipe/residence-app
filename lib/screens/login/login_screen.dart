@@ -3,11 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:residence_app/providers/auth_provider.dart';
 import 'package:residence_app/services/auth_service.dart';
-import 'register_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -67,17 +66,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
       if (!mounted) return;
 
+      // Update auth state — GoRouter's redirect will navigate automatically
       ref.read(authStateProvider.notifier).setAuthenticated(
         role: response.isAdmin ? 'admin' : 'user',
         email: response.email,
         name: response.fullName,
       );
-      if (!mounted) return;
-      context.go(response.isAdmin ? '/admin' : '/user');
+      // No need for context.go — the router redirect handles navigation
+      // when authStateProvider changes (via refreshListenable).
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() {
         _generalError = AuthService.parseError(e);
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _generalError = '$e';
         _isLoading = false;
       });
     }
@@ -306,7 +312,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               if (_passwordError != null)
                 _buildErrorText(_passwordError!),
-              const SizedBox(height: 32),
+              const SizedBox(height: 12),
+
+              // Forgot password link
+              Align(
+                alignment: Alignment.centerRight,
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ForgotPasswordScreen(),
+                    ),
+                  ),
+                  child: Text(
+                    '¿Olvidaste tu contraseña?',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: _primary,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
 
               // Login button
               GestureDetector(
@@ -346,38 +373,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-
-              // Register link
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '¿No tienes cuenta? ',
-                    style: GoogleFonts.dmSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w400,
-                      color: _darkText.withValues(alpha: 0.6),
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            const RegisterScreen(),
-                      ),
-                    ),
-                    child: Text(
-                      'Regístrate',
-                      style: GoogleFonts.dmSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: _primary,
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ],
           ),

@@ -1,14 +1,105 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:residence_app/core/api_client.dart';
+import 'package:residence_app/core/session_manager.dart';
 import 'package:residence_app/core/theme/app_colors.dart';
 import 'package:residence_app/core/theme/app_text_styles.dart';
+import 'package:residence_app/models/auth_models.dart';
 import 'package:residence_app/screens/login/login_screen.dart';
+import 'package:residence_app/screens/profile/change_password_screen.dart';
+import 'package:residence_app/ui/screens/user/pqrs/user_pqrs_screen.dart';
 
-class UserProfileScreen extends StatelessWidget {
+class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
 
   @override
+  State<UserProfileScreen> createState() => _UserProfileScreenState();
+}
+
+class _UserProfileScreenState extends State<UserProfileScreen> {
+  String _name = '';
+  String _email = '';
+  String _initials = '?';
+  String? _phone;
+  String? _document;
+  UserProperty? _property;
+  String _roleName = 'Residente';
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    // Try /auth/me first, fallback to cached session
+    Map<String, dynamic>? userData;
+    try {
+      final resp = await ApiClient().dio.get('/api/v1/auth/me');
+      userData = resp.data['data'];
+    } catch (_) {
+      userData = await SessionManager().getUser();
+    }
+
+    if (userData == null || !mounted) return;
+
+    final String name =
+        (userData['full_name'] ?? '').toString().trim();
+    final String email = (userData['email'] ?? '').toString();
+    final initials = name.isNotEmpty
+        ? name
+            .split(' ')
+            .where((w) => w.isNotEmpty)
+            .take(2)
+            .map((w) => w[0].toUpperCase())
+            .join()
+        : '?';
+
+    UserProperty? prop;
+    final props = userData['properties'] as List?;
+    if (props != null && props.isNotEmpty) {
+      prop = UserProperty.fromJson(Map<String, dynamic>.from(props.first));
+    }
+
+    String role = 'Residente';
+    final condos = userData['condominiums'] as List?;
+    if (condos != null && condos.isNotEmpty) {
+      final first = condos.first;
+      if (first is Map) {
+        role = (first['role_name'] ?? first['role'] ?? 'Residente').toString();
+      }
+    }
+
+    setState(() {
+      _name = name;
+      _email = email;
+      _initials = initials;
+      _phone = userData?['phone']?.toString();
+      _document = userData?['document_number']?.toString();
+      _property = prop;
+      _roleName = role;
+      _loading = false;
+    });
+  }
+
+  Future<void> _logout() async {
+    await SessionManager().clear();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const SafeArea(
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return SafeArea(
       child: SingleChildScrollView(
         child: Padding(
@@ -19,27 +110,26 @@ class UserProfileScreen extends StatelessWidget {
               const SizedBox(height: 24),
               const Divider(height: 1, color: AppColors.divider),
               const SizedBox(height: 24),
-              _buildUnitInfoCard(),
+              if (_property != null) ...[
+                _buildUnitInfoCard(),
+                const SizedBox(height: 24),
+              ],
+              _buildPersonalInfoCard(),
+              const SizedBox(height: 24),
+              _buildMenuSection(context, 'Gestiones', [
+                _MenuItem(Icons.assignment_rounded, 'Mis PQRS',
+                    onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const UserPqrsScreen()))),
+              ]),
               const SizedBox(height: 24),
               _buildMenuSection(context, 'Mi Cuenta', [
-                _MenuItem(Icons.person_outline_rounded, 'Datos personales'),
-                _MenuItem(Icons.lock_outline_rounded, 'Cambiar contraseña'),
-              ]),
-              const SizedBox(height: 24),
-              _buildMenuSection(context, 'Historial', [
-                _MenuItem(Icons.receipt_long_rounded, 'Historial de pagos'),
-                _MenuItem(Icons.calendar_today_rounded, 'Mis reservas'),
-                _MenuItem(Icons.assignment_outlined, 'Mis PQRS'),
-              ]),
-              const SizedBox(height: 24),
-              _buildMenuSection(context, 'Preferencias', [
-                _MenuItem(Icons.notifications_outlined, 'Notificaciones'),
-              ]),
-              const SizedBox(height: 24),
-              _buildMenuSection(context, 'Soporte', [
-                _MenuItem(Icons.help_outline_rounded, 'Centro de ayuda'),
-                _MenuItem(Icons.mail_outline_rounded, 'Contactar administración'),
-                _MenuItem(Icons.description_outlined, 'Términos y condiciones'),
+                _MenuItem(Icons.lock_outline_rounded, 'Cambiar contraseña',
+                    onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const ChangePasswordScreen()))),
               ]),
               const SizedBox(height: 24),
               Text(
@@ -51,7 +141,7 @@ class UserProfileScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              _buildLogoutButton(context),
+              _buildLogoutButton(),
             ],
           ),
         ),
@@ -62,7 +152,6 @@ class UserProfileScreen extends StatelessWidget {
   Widget _buildProfileHeader() {
     return Column(
       children: [
-        // Avatar
         Container(
           width: 80,
           height: 80,
@@ -72,7 +161,7 @@ class UserProfileScreen extends StatelessWidget {
           ),
           child: Center(
             child: Text(
-              'JR',
+              _initials,
               style: GoogleFonts.publicSans(
                 fontSize: 28,
                 fontWeight: FontWeight.w700,
@@ -82,9 +171,8 @@ class UserProfileScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
-        // Name
         Text(
-          'Juan Rodríguez',
+          _name,
           style: GoogleFonts.publicSans(
             fontSize: 22,
             fontWeight: FontWeight.w700,
@@ -92,37 +180,38 @@ class UserProfileScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        // Email
         Text(
-          'juan.rodriguez@email.com',
+          _email,
           style: GoogleFonts.publicSans(
             fontSize: 14,
             fontWeight: FontWeight.w400,
             color: AppColors.textSecondary,
           ),
         ),
-        const SizedBox(height: 12),
-        // Unit badge
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            'Torre 2 - Apto 301',
-            style: GoogleFonts.publicSans(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.primary,
+        if (_property != null) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              _property!.displayName,
+              style: GoogleFonts.publicSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
             ),
           ),
-        ),
+        ],
       ],
     );
   }
 
   Widget _buildUnitInfoCard() {
+    final prop = _property!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -152,13 +241,61 @@ class UserProfileScreen extends StatelessWidget {
           ),
           child: Column(
             children: [
-              _infoRow('Torre', '2'),
+              if (prop.block != null && prop.block!.isNotEmpty) ...[
+                _infoRow('Bloque/Torre', prop.block!),
+                const Divider(height: 20, color: AppColors.borderLight),
+              ],
+              _infoRow('Unidad', prop.propertyNumber),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPersonalInfoCard() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Información Personal',
+          style: GoogleFonts.publicSans(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.5,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.cardBackground,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.borderLight),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0D000000),
+                blurRadius: 2,
+                offset: Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              _infoRow('Nombre', _name),
               const Divider(height: 20, color: AppColors.borderLight),
-              _infoRow('Apartamento', '301'),
+              _infoRow('Email', _email),
+              if (_phone != null && _phone!.isNotEmpty) ...[
+                const Divider(height: 20, color: AppColors.borderLight),
+                _infoRow('Teléfono', _phone!),
+              ],
+              if (_document != null && _document!.isNotEmpty) ...[
+                const Divider(height: 20, color: AppColors.borderLight),
+                _infoRow('Documento', _document!),
+              ],
               const Divider(height: 20, color: AppColors.borderLight),
-              _infoRow('Área', '72 m\u00B2'),
-              const Divider(height: 20, color: AppColors.borderLight),
-              _infoRow('Propietario', 'Juan Rodríguez'),
+              _infoRow('Rol', _roleName),
             ],
           ),
         ),
@@ -170,19 +307,20 @@ class UserProfileScreen extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: AppTextStyles.bodySmall,
-        ),
-        Text(
-          value,
-          style: AppTextStyles.semiBold14,
+        Text(label, style: AppTextStyles.bodySmall),
+        Flexible(
+          child: Text(
+            value,
+            style: AppTextStyles.semiBold14,
+            textAlign: TextAlign.end,
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildMenuSection(BuildContext context, String title, List<_MenuItem> items) {
+  Widget _buildMenuSection(
+      BuildContext context, String title, List<_MenuItem> items) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -221,30 +359,19 @@ class UserProfileScreen extends StatelessWidget {
                       color: AppColors.borderLight,
                     ),
                   GestureDetector(
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Próximamente',
-                            style: GoogleFonts.publicSans(fontWeight: FontWeight.w500),
-                          ),
-                          duration: const Duration(seconds: 1),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      );
-                    },
+                    onTap: item.onTap,
                     behavior: HitTestBehavior.opaque,
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
                       child: Row(
                         children: [
-                          Icon(item.icon, size: 20, color: AppColors.textSecondary),
+                          Icon(item.icon,
+                              size: 20, color: AppColors.textSecondary),
                           const SizedBox(width: 16),
                           Expanded(
-                            child: Text(item.title, style: AppTextStyles.medium14),
+                            child:
+                                Text(item.title, style: AppTextStyles.medium14),
                           ),
                           const Icon(
                             Icons.chevron_right_rounded,
@@ -264,16 +391,11 @@ class UserProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildLogoutButton(BuildContext context) {
+  Widget _buildLogoutButton() {
     return SizedBox(
       width: double.infinity,
       child: GestureDetector(
-        onTap: () {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const LoginScreen()),
-            (route) => false,
-          );
-        },
+        onTap: _logout,
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
@@ -311,5 +433,6 @@ class UserProfileScreen extends StatelessWidget {
 class _MenuItem {
   final IconData icon;
   final String title;
-  const _MenuItem(this.icon, this.title);
+  final VoidCallback? onTap;
+  const _MenuItem(this.icon, this.title, {this.onTap});
 }
