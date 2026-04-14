@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/repositories/condo_repository.dart';
-import '../data/datasources/mock/mock_condo_datasource.dart';
+import '../data/datasources/api/api_condo_datasource.dart';
 
 final condoRepositoryProvider = Provider<CondoRepository>((ref) {
-  return MockCondoDatasource();
+  return ApiCondoDatasource();
 });
 
 final featuredCondosProvider =

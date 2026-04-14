@@ -60,11 +60,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: RouteNames.condoProfile,
-        builder: (context, state) => const CondoProfileScreen(),
+        builder: (context, state) {
+          final condo = state.extra as Map<String, dynamic>? ?? {'name': '', 'location': '', 'image': 'assets/images/condo1.png'};
+          return CondoProfileScreen(condo: condo);
+        },
       ),
       GoRoute(
         path: RouteNames.visitorPreregister,
-        builder: (context, state) => const VisitorPreregisterScreen(),
+        builder: (context, state) {
+          final condoName = state.extra as String? ?? 'Conjunto Residencial';
+          return VisitorPreregisterScreen(condoName: condoName);
+        },
       ),
 
       // ── Admin shell ──

@@ -1,10 +1,15 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../core/api_client.dart';
 import '../../theme/app_colors.dart';
 
 class VisitorPreregisterScreen extends StatefulWidget {
-  const VisitorPreregisterScreen({super.key});
+  final String condoName;
+  final String? condoId;
+
+  const VisitorPreregisterScreen({super.key, this.condoName = 'Conjunto Residencial', this.condoId});
 
   @override
   State<VisitorPreregisterScreen> createState() => _VisitorPreregisterScreenState();
@@ -22,6 +27,7 @@ class _VisitorPreregisterScreenState extends State<VisitorPreregisterScreen> {
   final _plateController = TextEditingController();
   DateTime? _visitDate;
   TimeOfDay? _visitTime;
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -64,101 +70,154 @@ class _VisitorPreregisterScreenState extends State<VisitorPreregisterScreen> {
     if (time != null) setState(() => _visitTime = time);
   }
 
-  void _submit() {
-    if (_formKey.currentState!.validate()) {
-      showDialog(
-        context: context,
-        builder: (ctx) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: const BoxDecoration(
-                    color: Color(0x1A16A34A),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.check_rounded, color: Color(0xFF16A34A), size: 32),
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (widget.condoId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo identificar el conjunto')),
+      );
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      final dio = ApiClient().dio;
+      final date = _visitDate ?? DateTime.now();
+      final body = <String, dynamic>{
+        'condominium_id': widget.condoId,
+        'visitor_name': _nameController.text.trim(),
+        'property_number': _unitController.text.trim(),
+        'expected_date': '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
+        if (_idController.text.trim().isNotEmpty)
+          'document_number': _idController.text.trim(),
+        if (_phoneController.text.trim().isNotEmpty)
+          'phone': _phoneController.text.trim(),
+        if (_reasonController.text.trim().isNotEmpty)
+          'reason': _reasonController.text.trim(),
+        if (_vehicleType != 'Ninguno')
+          'vehicle_type': _vehicleType,
+        if (_plateController.text.trim().isNotEmpty)
+          'vehicle_plate': _plateController.text.trim(),
+        if (_visitTime != null)
+          'expected_time': '${_visitTime!.hour.toString().padLeft(2, '0')}:${_visitTime!.minute.toString().padLeft(2, '0')}',
+      };
+
+      final response = await dio.post('/api/v1/visitors/preregister', data: body);
+      if (!mounted) return;
+
+      final data = response.data['data'] as Map<String, dynamic>;
+      final refCode = data['reference_code'] ?? '';
+
+      setState(() => _submitting = false);
+      _showSuccessDialog(refCode);
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      final msg = (e.response?.data is Map)
+          ? (e.response!.data['detail'] ?? 'Error al registrar')
+          : 'No se pudo conectar al servidor';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg.toString())));
+    }
+  }
+
+  void _showSuccessDialog(String referenceCode) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: const BoxDecoration(
+                  color: Color(0x1A16A34A),
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'Pre-registro exitoso',
-                  style: GoogleFonts.publicSans(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textDark,
-                  ),
+                child: const Icon(Icons.check_rounded, color: Color(0xFF16A34A), size: 32),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Pre-registro exitoso',
+                style: GoogleFonts.publicSans(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textDark,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Tu visita ha sido pre-registrada. Presenta tu código QR en portería al momento de llegar.',
-                  style: GoogleFonts.publicSans(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                    height: 22 / 14,
-                    color: AppColors.textSecondary,
-                  ),
-                  textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Tu visita ha sido pre-registrada. Presenta tu código en portería al momento de llegar.',
+                style: GoogleFonts.publicSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  height: 22 / 14,
+                  color: AppColors.textSecondary,
                 ),
-                const SizedBox(height: 20),
-                // Mock QR
-                Container(
-                  width: 160,
-                  height: 160,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.borderLight),
-                  ),
-                  child: const Center(
-                    child: Icon(Icons.qr_code_2_rounded, size: 120, color: AppColors.textDark),
-                  ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.borderLight),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'VIS-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
-                  style: GoogleFonts.publicSans(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
-                    letterSpacing: 1,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    Navigator.of(context).pop();
-                  },
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(12),
+                child: Column(
+                  children: [
+                    Text(
+                      'Tu código de visita',
+                      style: GoogleFonts.publicSans(fontSize: 12, color: AppColors.textSecondary),
                     ),
-                    child: Center(
-                      child: Text(
-                        'Listo',
-                        style: GoogleFonts.publicSans(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
+                    const SizedBox(height: 8),
+                    Text(
+                      referenceCode,
+                      style: GoogleFonts.publicSans(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              GestureDetector(
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  Navigator.of(context).pop();
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Listo',
+                      style: GoogleFonts.publicSans(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
                       ),
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-      );
-    }
+      ),
+    );
   }
 
   @override
@@ -190,7 +249,7 @@ class _VisitorPreregisterScreenState extends State<VisitorPreregisterScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Conjunto Residencial El Nogal',
+                        widget.condoName,
                         style: GoogleFonts.publicSans(
                           fontSize: 15,
                           fontWeight: FontWeight.w400,
@@ -285,12 +344,12 @@ class _VisitorPreregisterScreenState extends State<VisitorPreregisterScreen> {
 
                       // Submit button
                       GestureDetector(
-                        onTap: _submit,
+                        onTap: _submitting ? null : _submit,
                         child: Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           decoration: BoxDecoration(
-                            color: AppColors.primary,
+                            color: _submitting ? AppColors.primary.withValues(alpha: 0.5) : AppColors.primary,
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: const [
                               BoxShadow(
@@ -301,21 +360,23 @@ class _VisitorPreregisterScreenState extends State<VisitorPreregisterScreen> {
                               ),
                             ],
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 20),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Generar pre-registro',
-                                style: GoogleFonts.publicSans(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
+                          child: _submitting
+                              ? const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)))
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 20),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Generar pre-registro',
+                                      style: GoogleFonts.publicSans(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                            ],
-                          ),
                         ),
                       ),
                       const SizedBox(height: 16),

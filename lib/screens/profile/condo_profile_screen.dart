@@ -3,16 +3,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../theme/app_colors.dart';
 import '../login/login_screen.dart';
 import 'visitor_preregister_screen.dart';
 
-class CondoProfileScreen extends StatelessWidget {
-  const CondoProfileScreen({super.key});
+class CondoProfileScreen extends StatefulWidget {
+  final Map<String, dynamic> condo;
 
+  const CondoProfileScreen({super.key, required this.condo});
+
+  @override
+  State<CondoProfileScreen> createState() => _CondoProfileScreenState();
+}
+
+class _CondoProfileScreenState extends State<CondoProfileScreen> {
   static const Color _dark = Color(0xFF0F172A);
   static const Color _body = Color(0xFF64748B);
   static const Color _sectionBorder = Color(0x1AEC5B13);
+
+  bool _isFavorite = false;
+
+  Map<String, dynamic> get condo => widget.condo;
 
   @override
   Widget build(BuildContext context) {
@@ -74,9 +86,10 @@ class CondoProfileScreen extends StatelessWidget {
                   Row(children: [
                     GestureDetector(
                       onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Compartir')),
-                        );
+                        final name = condo['name'] as String? ?? '';
+                        final address = condo['address'] as String? ?? '';
+                        final location = condo['location'] as String? ?? '';
+                        SharePlus.instance.share(ShareParams(text: '$name\n$address, $location\n\nEncuéntralo en Residence App'));
                       },
                       child: SizedBox(width: 40, height: 40, child: Center(
                         child: SvgPicture.asset('assets/icons/prof_share.svg', width: 18, height: 20),
@@ -85,12 +98,15 @@ class CondoProfileScreen extends StatelessWidget {
                     const SizedBox(width: 8),
                     GestureDetector(
                       onTap: () {
+                        setState(() => _isFavorite = !_isFavorite);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Añadido a favoritos')),
+                          SnackBar(content: Text(_isFavorite ? 'Añadido a favoritos' : 'Eliminado de favoritos')),
                         );
                       },
                       child: SizedBox(width: 40, height: 40, child: Center(
-                        child: SvgPicture.asset('assets/icons/prof_heart.svg', width: 20, height: 18.35),
+                        child: _isFavorite
+                            ? const Icon(Icons.favorite, size: 20, color: AppColors.primary)
+                            : SvgPicture.asset('assets/icons/prof_heart.svg', width: 20, height: 18.35),
                       )),
                     ),
                   ]),
@@ -104,12 +120,24 @@ class CondoProfileScreen extends StatelessWidget {
   }
 
   Widget _buildHero() {
+    final image = condo['image'];
+    final name = condo['name'] as String? ?? '';
+    final location = condo['location'] as String? ?? '';
+
     return AspectRatio(
       aspectRatio: 16 / 9,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset('assets/images/profile_hero.png', fit: BoxFit.cover),
+          if (image != null && image.toString().startsWith('assets/'))
+            Image.asset(image as String, fit: BoxFit.cover)
+          else
+            Container(
+              color: const Color(0xFF1E293B),
+              child: Center(
+                child: Icon(Icons.apartment_rounded, size: 64, color: Colors.white.withValues(alpha: 0.3)),
+              ),
+            ),
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -138,14 +166,14 @@ class CondoProfileScreen extends StatelessWidget {
                   ]),
                 ),
                 const SizedBox(height: 8),
-                Text('Conjunto Residencial El Nogal', style: GoogleFonts.publicSans(
+                Text(name, style: GoogleFonts.publicSans(
                   fontSize: 24, fontWeight: FontWeight.w700, height: 30/24, color: Colors.white,
                 )),
                 const SizedBox(height: 4),
                 Row(children: [
                   SvgPicture.asset('assets/icons/prof_pin.svg', width: 9.333, height: 11.667),
                   const SizedBox(width: 4),
-                  Text('Bogotá, Colombia', style: GoogleFonts.publicSans(
+                  Text(location, style: GoogleFonts.publicSans(
                     fontSize: 14, fontWeight: FontWeight.w400, height: 20/14, color: Colors.white.withValues(alpha: 0.9),
                   )),
                 ]),
@@ -158,18 +186,22 @@ class CondoProfileScreen extends StatelessWidget {
   }
 
   Widget _buildStats() {
+    final towers = condo['towers']?.toString() ?? '-';
+    final units = condo['units']?.toString() ?? '-';
+    final estrato = condo['estrato']?.toString() ?? '-';
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 25),
       decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _sectionBorder))),
       child: Row(children: [
-        Expanded(child: _statContent('5', 'Torres')),
+        Expanded(child: _statContent(towers, 'Torres')),
         Expanded(child: Container(
           decoration: const BoxDecoration(border: Border(
             left: BorderSide(color: _sectionBorder), right: BorderSide(color: _sectionBorder),
           )),
-          child: _statContent('240', 'Unidades'),
+          child: _statContent(units, 'Unidades'),
         )),
-        Expanded(child: _statContent('5', 'Estrato')),
+        Expanded(child: _statContent(estrato, 'Estrato')),
       ]),
     );
   }
@@ -187,6 +219,9 @@ class CondoProfileScreen extends StatelessWidget {
   }
 
   Widget _buildInfoSection() {
+    final address = condo['address'] as String? ?? '';
+    final locality = condo['locality'] as String? ?? '';
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 17),
       decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _sectionBorder))),
@@ -200,10 +235,12 @@ class CondoProfileScreen extends StatelessWidget {
             child: Center(child: SvgPicture.asset('assets/icons/prof_location.svg', width: 18, height: 18)),
           ),
           const SizedBox(width: 16),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Calle 100 #15-30', style: GoogleFonts.publicSans(fontSize: 16, fontWeight: FontWeight.w700, height: 24/16, color: _dark)),
-            Text('Localidad de Usaquén, Bogotá', style: GoogleFonts.publicSans(fontSize: 14, fontWeight: FontWeight.w400, height: 20/14, color: _body)),
-          ]),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(address, style: GoogleFonts.publicSans(fontSize: 16, fontWeight: FontWeight.w700, height: 24/16, color: _dark)),
+              Text(locality, style: GoogleFonts.publicSans(fontSize: 14, fontWeight: FontWeight.w400, height: 20/14, color: _body)),
+            ]),
+          ),
         ]),
         const SizedBox(height: 16),
         // Map placeholder
@@ -235,14 +272,10 @@ class CondoProfileScreen extends StatelessWidget {
   }
 
   Widget _buildAmenities() {
-    final amenities = [
-      {'icon': 'assets/icons/prof_pool.svg', 'label': 'Piscina\nClimatizada', 'w': 20.0, 'h': 18.0, 'tall': true},
-      {'icon': 'assets/icons/prof_gym.svg', 'label': 'Gimnasio', 'w': 19.8, 'h': 19.8, 'tall': true},
-      {'icon': 'assets/icons/prof_bbq.svg', 'label': 'Zona BBQ', 'w': 20.0, 'h': 20.0, 'tall': false},
-      {'icon': 'assets/icons/prof_playground.svg', 'label': 'Parque Infantil', 'w': 18.0, 'h': 18.0, 'tall': false},
-      {'icon': 'assets/icons/prof_visitors.svg', 'label': 'Visitantes', 'w': 13.0, 'h': 18.0, 'tall': false},
-      {'icon': 'assets/icons/prof_security.svg', 'label': 'Vigilancia 24/7', 'w': 16.0, 'h': 20.0, 'tall': false},
-    ];
+    final amenities = (condo['amenities'] as List<dynamic>?)
+        ?.cast<Map<String, dynamic>>() ?? [];
+
+    if (amenities.isEmpty) return const SizedBox.shrink();
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 17),
@@ -258,9 +291,8 @@ class CondoProfileScreen extends StatelessWidget {
           itemCount: amenities.length,
           itemBuilder: (_, i) {
             final a = amenities[i];
-            final isTall = (a['tall'] as bool?) ?? false;
             return Container(
-              height: isTall ? 66 : 50,
+              height: 50,
               padding: const EdgeInsets.all(13),
               decoration: BoxDecoration(
                 color: Colors.white, borderRadius: BorderRadius.circular(12),
@@ -268,61 +300,50 @@ class CondoProfileScreen extends StatelessWidget {
                 boxShadow: const [BoxShadow(color: Color(0x0D000000), blurRadius: 2, offset: Offset(0, 1))],
               ),
               child: Row(children: [
-                SvgPicture.asset(a['icon'] as String, width: a['w'] as double, height: a['h'] as double),
+                SvgPicture.asset(a['icon'] as String, width: 20, height: 18),
                 const SizedBox(width: 12),
-                Text(a['label'] as String, style: GoogleFonts.publicSans(fontSize: 14, fontWeight: FontWeight.w500, height: 20/14, color: _dark)),
+                Expanded(
+                  child: Text(a['label'] as String, style: GoogleFonts.publicSans(fontSize: 14, fontWeight: FontWeight.w500, height: 20/14, color: _dark),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ]),
             );
           },
         ),
-        const SizedBox(height: 16),
-        Center(child: Builder(
-          builder: (context) => GestureDetector(
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Próximamente')),
-              );
-            },
-            child: Text('Mostrar las 12 amenidades', style: GoogleFonts.publicSans(
-              fontSize: 14, fontWeight: FontWeight.w700, height: 20/14, color: AppColors.primary,
-              decoration: TextDecoration.underline, decorationColor: AppColors.primary,
-            )),
-          ),
-        )),
       ]),
     );
   }
 
   Widget _buildNews() {
+    final news = (condo['news'] as List<dynamic>?)
+        ?.cast<Map<String, dynamic>>() ?? [];
+
+    if (news.isEmpty) return const SizedBox.shrink();
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 17),
       decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _sectionBorder))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionTitle('Noticias y Anuncios'),
         const SizedBox(height: 16),
-        // Maintenance card
-        _newsCard(
-          borderColor: AppColors.primary,
-          bgColor: const Color(0x0DEC5B13),
-          badgeBg: const Color(0x1AEC5B13),
-          badgeText: AppColors.primary,
-          badge: 'MANTENIMIENTO',
-          time: 'Hoy',
-          title: 'Cierre temporal de ascensores Torre 2',
-          body: 'Se realizará mantenimiento preventivo desde las 10:00 AM hasta las 2:00 PM.',
-        ),
-        const SizedBox(height: 16),
-        // Community card
-        _newsCard(
-          borderColor: Colors.transparent,
-          bgColor: AppColors.borderLight,
-          badgeBg: AppColors.divider,
-          badgeText: _body,
-          badge: 'COMUNIDAD',
-          time: 'Ayer',
-          title: 'Nueva jornada de reciclaje',
-          body: 'Acompáñanos este sábado en el salón comunal para aprender sobre separación de residuos.',
-        ),
+        ...news.map((n) {
+          final type = n['type'] as String;
+          final isMaintenance = type == 'mantenimiento';
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: _newsCard(
+              borderColor: isMaintenance ? AppColors.primary : Colors.transparent,
+              bgColor: isMaintenance ? const Color(0x0DEC5B13) : AppColors.borderLight,
+              badgeBg: isMaintenance ? const Color(0x1AEC5B13) : AppColors.divider,
+              badgeText: isMaintenance ? AppColors.primary : _body,
+              badge: type.toUpperCase(),
+              time: n['time'] as String,
+              title: n['title'] as String,
+              body: n['body'] as String,
+            ),
+          );
+        }),
       ]),
     );
   }
@@ -361,16 +382,25 @@ class CondoProfileScreen extends StatelessWidget {
   }
 
   Widget _buildContact() {
+    final contact = condo['contact'] as Map<String, dynamic>?;
+    if (contact == null) return const SizedBox.shrink();
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 48),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionTitle('Contacto'),
         const SizedBox(height: 16),
-        _contactRow('assets/icons/prof_phone.svg', 18, 18, 'Portería Principal', '+57 601 234 5678'),
+        _contactRow('assets/icons/prof_phone.svg', 18, 18,
+            contact['phoneLabel'] as String? ?? 'Teléfono',
+            contact['phone'] as String? ?? ''),
         const SizedBox(height: 16),
-        _contactRow('assets/icons/prof_email.svg', 20, 16, 'Administración', 'elnogal@residence.com'),
+        _contactRow('assets/icons/prof_email.svg', 20, 16,
+            contact['emailLabel'] as String? ?? 'Email',
+            contact['email'] as String? ?? ''),
         const SizedBox(height: 16),
-        _contactRow('assets/icons/prof_clock.svg', 20, 20, 'Horarios de Oficina', 'Lun - Vie: 8:00 AM - 5:00 PM'),
+        _contactRow('assets/icons/prof_clock.svg', 20, 20,
+            contact['hoursLabel'] as String? ?? 'Horarios',
+            contact['hours'] as String? ?? ''),
       ]),
     );
   }
@@ -383,10 +413,12 @@ class CondoProfileScreen extends StatelessWidget {
         child: Center(child: SvgPicture.asset(icon, width: w, height: h)),
       ),
       const SizedBox(width: 16),
-      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: GoogleFonts.publicSans(fontSize: 14, fontWeight: FontWeight.w700, height: 20/14, color: _dark)),
-        Text(subtitle, style: GoogleFonts.publicSans(fontSize: 14, fontWeight: FontWeight.w400, height: 20/14, color: _body)),
-      ]),
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: GoogleFonts.publicSans(fontSize: 14, fontWeight: FontWeight.w700, height: 20/14, color: _dark)),
+          Text(subtitle, style: GoogleFonts.publicSans(fontSize: 14, fontWeight: FontWeight.w400, height: 20/14, color: _body)),
+        ]),
+      ),
     ]);
   }
 
@@ -427,7 +459,10 @@ class CondoProfileScreen extends StatelessWidget {
           // Voy a visitar
           GestureDetector(
             onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const VisitorPreregisterScreen()),
+              MaterialPageRoute(builder: (_) => VisitorPreregisterScreen(
+                condoName: condo['name'] as String? ?? 'Conjunto Residencial',
+                condoId: condo['id'] as String?,
+              )),
             ),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),

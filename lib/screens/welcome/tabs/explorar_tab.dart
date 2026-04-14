@@ -1,23 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../providers/condo_provider.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_text_styles.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../login/login_screen.dart';
 import '../../profile/condo_profile_screen.dart';
+import '../../profile/all_condos_screen.dart';
 
-class ExplorarTab extends StatelessWidget {
+class ExplorarTab extends ConsumerWidget {
   const ExplorarTab({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return SingleChildScrollView(
       child: Column(
         children: [
           SizedBox(height: MediaQuery.of(context).padding.top + 64),
           _buildHeroSection(),
-          _buildSearchSection(),
+          _buildSearchSection(context, ref),
           const SizedBox(height: 32),
-          _buildFeaturedCondos(context),
+          _buildFeaturedCondos(context, ref),
           const SizedBox(height: 32),
           _buildFeatureGrid(),
           const SizedBox(height: 32),
@@ -90,7 +95,7 @@ class ExplorarTab extends StatelessWidget {
     );
   }
 
-  Widget _buildSearchSection() {
+  Widget _buildSearchSection(BuildContext context, WidgetRef ref) {
     return Transform.translate(
       offset: const Offset(0, -32),
       child: Padding(
@@ -118,58 +123,47 @@ class ExplorarTab extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Container(
-                height: 56,
-                decoration: BoxDecoration(
-                  color: AppColors.borderLight,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: 17),
-                      child: SvgPicture.asset(
-                        'assets/icons/welcome_search.svg',
-                        width: 30,
-                        height: 18,
-                      ),
+              GestureDetector(
+                onTap: () {
+                  final condos = ref.read(featuredCondosProvider).valueOrNull ?? [];
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => AllCondosScreen(condos: condos, searchMode: true),
                     ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(
-                          'Busca tu conjunto por nombre...',
-                          style: GoogleFonts.publicSans(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w400,
-                            color: const Color(0xFF94A3B8),
+                  );
+                },
+                child: Container(
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppColors.borderLight,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(left: 17),
+                        child: SvgPicture.asset(
+                          'assets/icons/welcome_search.svg',
+                          width: 30,
+                          height: 18,
+                        ),
+                      ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            'Busca tu conjunto por nombre...',
+                            style: GoogleFonts.publicSans(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w400,
+                              color: const Color(0xFF94A3B8),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SvgPicture.asset(
-                    'assets/icons/welcome_location.svg',
-                    width: 15,
-                    height: 15,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Usar mi ubicación',
-                    style: GoogleFonts.publicSans(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      height: 24 / 16,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ],
               ),
             ],
           ),
@@ -178,12 +172,8 @@ class ExplorarTab extends StatelessWidget {
     );
   }
 
-  Widget _buildFeaturedCondos(BuildContext context) {
-    final condos = [
-      {'image': 'assets/images/condo1.png', 'name': 'C.R. El Nogal', 'location': 'Bogotá, Norte'},
-      {'image': 'assets/images/condo2.png', 'name': 'Torres de Viento', 'location': 'Medellín, Poblado'},
-      {'image': 'assets/images/condo3.png', 'name': 'Hacienda Real', 'location': 'Chía, Cundinamarca'},
-    ];
+  Widget _buildFeaturedCondos(BuildContext context, WidgetRef ref) {
+    final asyncCondos = ref.watch(featuredCondosProvider);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -202,78 +192,97 @@ class ExplorarTab extends StatelessWidget {
                   color: AppColors.textDark,
                 ),
               ),
-              Text(
-                'Ver todos',
-                style: GoogleFonts.publicSans(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  height: 20 / 14,
-                  color: AppColors.primary,
+              GestureDetector(
+                onTap: () {
+                  final condos = asyncCondos.valueOrNull ?? [];
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => AllCondosScreen(condos: condos),
+                    ),
+                  );
+                },
+                child: Text(
+                  'Ver todos',
+                  style: GoogleFonts.publicSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    height: 20 / 14,
+                    color: AppColors.primary,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          SizedBox(
-            height: 208,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              clipBehavior: Clip.none,
-              itemCount: condos.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 16),
-              itemBuilder: (context, index) {
-                final condo = condos[index];
-                return GestureDetector(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const CondoProfileScreen(),
+          asyncCondos.when(
+            data: (condos) => SizedBox(
+              height: 208,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                clipBehavior: Clip.none,
+                itemCount: condos.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 16),
+                itemBuilder: (context, index) {
+                  final condo = condos[index];
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => CondoProfileScreen(condo: condo),
+                        ),
+                      );
+                    },
+                    child: SizedBox(
+                      width: 256,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: _buildCondoImage(condo['image'], 256, 160),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            condo['name'] as String,
+                            style: GoogleFonts.publicSans(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              height: 24 / 16,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              SvgPicture.asset(
+                                'assets/icons/welcome_pin.svg',
+                                width: 9.333,
+                                height: 11.667,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                condo['location'] as String,
+                                style: AppTextStyles.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                    );
-                  },
-                  child: SizedBox(
-                    width: 256,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.asset(
-                            condo['image']!,
-                            width: 256,
-                            height: 160,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          condo['name']!,
-                          style: GoogleFonts.publicSans(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            height: 24 / 16,
-                            color: AppColors.textDark,
-                          ),
-                        ),
-                        Row(
-                          children: [
-                            SvgPicture.asset(
-                              'assets/icons/welcome_pin.svg',
-                              width: 9.333,
-                              height: 11.667,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              condo['location']!,
-                              style: AppTextStyles.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ],
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
+            ),
+            loading: () => const SizedBox(
+              height: 208,
+              child: Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              ),
+            ),
+            error: (_, __) => const SizedBox(
+              height: 208,
+              child: Center(
+                child: Text('Error al cargar conjuntos'),
+              ),
             ),
           ),
         ],
@@ -285,12 +294,9 @@ class ExplorarTab extends StatelessWidget {
     final features = [
       {'icon': 'assets/icons/feat_payments.svg', 'label': 'Gestión de pagos', 'w': 22.0, 'h': 16.0},
       {'icon': 'assets/icons/feat_visitors.svg', 'label': 'Control visitantes', 'w': 16.0, 'h': 20.0},
-      {'icon': 'assets/icons/feat_ai.svg', 'label': 'Asistente IA', 'w': 22.0, 'h': 19.0},
       {'icon': 'assets/icons/feat_areas.svg', 'label': 'Áreas comunes', 'w': 18.0, 'h': 20.0},
       {'icon': 'assets/icons/feat_pqrs.svg', 'label': 'PQRS', 'w': 20.0, 'h': 20.0},
       {'icon': 'assets/icons/feat_news.svg', 'label': 'Noticias', 'w': 20.0, 'h': 18.0},
-      {'icon': 'assets/icons/feat_directory.svg', 'label': 'Directorio', 'w': 24.0, 'h': 18.0},
-      {'icon': 'assets/icons/feat_more.svg', 'label': 'Más', 'w': 20.0, 'h': 20.0},
     ];
 
     return Padding(
@@ -320,49 +326,56 @@ class ExplorarTab extends StatelessWidget {
             itemCount: features.length,
             itemBuilder: (context, index) {
               final f = features[index];
-              return Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0x0DEC5B13),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Color(0x0D000000),
-                            blurRadius: 2,
-                            offset: Offset(0, 1),
+              return GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0x0DEC5B13),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Color(0x0D000000),
+                              blurRadius: 2,
+                              offset: Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: SvgPicture.asset(
+                            f['icon'] as String,
+                            width: f['w'] as double,
+                            height: f['h'] as double,
                           ),
-                        ],
-                      ),
-                      child: Center(
-                        child: SvgPicture.asset(
-                          f['icon'] as String,
-                          width: f['w'] as double,
-                          height: f['h'] as double,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      f['label'] as String,
-                      style: GoogleFonts.publicSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        height: 20 / 14,
-                        color: AppColors.textDark,
+                      const SizedBox(height: 8),
+                      Text(
+                        f['label'] as String,
+                        style: GoogleFonts.publicSans(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          height: 20 / 14,
+                          color: AppColors.textDark,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               );
             },
@@ -407,18 +420,43 @@ class ExplorarTab extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
             ),
-            Text(
-              'Registra tu conjunto aquí →',
-              style: GoogleFonts.publicSans(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                height: 24 / 16,
-                color: AppColors.primary,
+            GestureDetector(
+              onTap: () {
+                final url = Uri.parse('https://wa.me/573123969747?text=${Uri.encodeComponent('Hola, quiero registrar mi conjunto en Residence App')}');
+                launchUrl(url, mode: LaunchMode.externalApplication);
+              },
+              child: Text(
+                'Registra tu conjunto aquí →',
+                style: GoogleFonts.publicSans(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  height: 24 / 16,
+                  color: AppColors.primary,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCondoImage(dynamic imagePath, double width, double height) {
+    if (imagePath != null && imagePath.toString().startsWith('assets/')) {
+      return Image.asset(imagePath as String, width: width, height: height, fit: BoxFit.cover);
+    }
+    return Container(
+      width: width,
+      height: height,
+      color: const Color(0xFFE2E8F0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.apartment_rounded, size: 40, color: AppColors.primary.withValues(alpha: 0.6)),
+          const SizedBox(height: 4),
+          Text('Residence', style: GoogleFonts.publicSans(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary.withValues(alpha: 0.6))),
+        ],
       ),
     );
   }

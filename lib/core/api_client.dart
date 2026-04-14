@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:residence_app/core/session_manager.dart';
 
 class ApiClient {
-  static const String _defaultBaseUrl = 'http://localhost:8000';
+  static const String _defaultBaseUrl = 'http://3.227.231.47';
 
   static final ApiClient _instance = ApiClient._internal();
   factory ApiClient() => _instance;

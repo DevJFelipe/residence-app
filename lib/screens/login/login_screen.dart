@@ -164,7 +164,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ),
                 Text(
-                  'Conjunto Residencial El Nogal',
+                  'Gestión exclusiva de tu comunidad',
                   style: GoogleFonts.cormorantGaramond(
                     fontSize: 20,
                     fontWeight: FontWeight.w400,
@@ -492,7 +492,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
         child: Center(
           child: Text(
-            '© 2024 Residence • Gestión Exclusiva',
+            '© ${DateTime.now().year} Residence • Gestión Exclusiva',
             style: GoogleFonts.dmSans(
               fontSize: 12,
               fontWeight: FontWeight.w400,

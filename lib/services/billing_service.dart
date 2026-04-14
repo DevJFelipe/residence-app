@@ -34,6 +34,47 @@ class BillingService {
     return List<Map<String, dynamic>>.from(response.data['data']);
   }
 
+  Future<Map<String, dynamic>> createInvoice({
+    required String propertyId,
+    required int chargeTypeId,
+    required double amount,
+    required String dueDate,
+    String? billingPeriod,
+    String? description,
+  }) async {
+    final response = await _dio.post('/api/v1/finance/invoices', data: {
+      'property_id': propertyId,
+      'charge_type_id': chargeTypeId,
+      'amount': amount,
+      'due_date': dueDate,
+      if (billingPeriod != null) 'billing_period': billingPeriod,
+      if (description != null) 'description': description,
+    });
+    return Map<String, dynamic>.from(response.data['data']);
+  }
+
+  Future<Map<String, dynamic>> registerPayment({
+    required String invoiceId,
+    required double amountPaid,
+    required int paymentMethodId,
+    String? reference,
+    String? notes,
+  }) async {
+    final response = await _dio.post('/api/v1/finance/payments', data: {
+      'invoice_id': invoiceId,
+      'amount_paid': amountPaid,
+      'payment_method_id': paymentMethodId,
+      if (reference != null) 'reference': reference,
+      if (notes != null) 'notes': notes,
+    });
+    return Map<String, dynamic>.from(response.data['data']);
+  }
+
+  Future<List<Map<String, dynamic>>> getPaymentMethods() async {
+    final response = await _dio.get('/api/v1/catalogs/payment_methods');
+    return List<Map<String, dynamic>>.from(response.data['data']);
+  }
+
   static String parseError(DioException e) {
     if (e.response?.data is Map) {
       final detail = e.response!.data['detail'];

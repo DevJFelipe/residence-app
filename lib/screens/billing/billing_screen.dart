@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../services/billing_service.dart';
+import '../../services/residents_service.dart';
 
 class BillingScreen extends StatefulWidget {
   const BillingScreen({super.key});
@@ -69,41 +70,54 @@ class _BillingScreenState extends State<BillingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Stack(
       children: [
-        _buildHeader(context),
-        Expanded(
-          child: _loading
-              ? const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary))
-              : _error != null
-                  ? _buildError()
-                  : RefreshIndicator(
-                      onRefresh: _load,
-                      color: AppColors.primary,
-                      child: Column(
-                        children: [
-                          _buildTabs(),
-                          _buildSummaryRow(),
-                          Expanded(
-                            child: _invoices.isEmpty
-                                ? Center(
-                                    child: Text('No hay facturas',
-                                        style: GoogleFonts.publicSans(
-                                            color: Colors.grey)))
-                                : ListView.separated(
-                                    padding: const EdgeInsets.fromLTRB(
-                                        16, 8, 16, 24),
-                                    itemCount: _invoices.length,
-                                    separatorBuilder: (_, __) =>
-                                        const SizedBox(height: 10),
-                                    itemBuilder: (_, i) =>
-                                        _buildInvoiceCard(_invoices[i]),
-                                  ),
+        Column(
+          children: [
+            _buildHeader(context),
+            Expanded(
+              child: _loading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: AppColors.primary))
+                  : _error != null
+                      ? _buildError()
+                      : RefreshIndicator(
+                          onRefresh: _load,
+                          color: AppColors.primary,
+                          child: Column(
+                            children: [
+                              _buildTabs(),
+                              _buildSummaryRow(),
+                              Expanded(
+                                child: _invoices.isEmpty
+                                    ? Center(
+                                        child: Text('No hay facturas',
+                                            style: GoogleFonts.publicSans(
+                                                color: Colors.grey)))
+                                    : ListView.separated(
+                                        padding: const EdgeInsets.fromLTRB(
+                                            16, 8, 16, 80),
+                                        itemCount: _invoices.length,
+                                        separatorBuilder: (_, _) =>
+                                            const SizedBox(height: 10),
+                                        itemBuilder: (_, i) =>
+                                            _buildInvoiceCard(_invoices[i]),
+                                      ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
+                        ),
+            ),
+          ],
+        ),
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: FloatingActionButton(
+            onPressed: () => _showCreateInvoiceSheet(),
+            backgroundColor: AppColors.primary,
+            child: const Icon(Icons.add, color: Colors.white),
+          ),
         ),
       ],
     );
@@ -421,6 +435,9 @@ class _BillingScreenState extends State<BillingScreen> {
     final paid = amount - balance;
     final property =
         '${inv['property_block'] ?? ''} ${inv['property_number'] ?? ''}'.trim();
+    final status = (inv['payment_status_name'] ?? inv['payment_status'] ?? '')
+        .toString().toLowerCase();
+    final canPay = status == 'pendiente' || status == 'vencido';
 
     showModalBottomSheet(
       context: context,
@@ -456,20 +473,346 @@ class _BillingScreenState extends State<BillingScreen> {
                     color: AppColors.textDark)),
             const SizedBox(height: 16),
             _detailRow('Unidad', property),
-            _detailRow(
-                'Tipo de cargo', inv['charge_type_name']?.toString() ?? ''),
+            _detailRow('Tipo de cargo', inv['charge_type_name']?.toString() ?? ''),
             _detailRow('Descripción', inv['description']?.toString() ?? ''),
             _detailRow('Periodo', inv['billing_period']?.toString() ?? ''),
             _detailRow('Monto', '\$${amount.toStringAsFixed(0)}'),
             _detailRow('Pagado', '\$${paid.toStringAsFixed(0)}'),
             _detailRow('Saldo', '\$${balance.toStringAsFixed(0)}'),
-            _detailRow(
-                'Estado',
-                (inv['payment_status_name'] ?? inv['payment_status'] ?? '')
-                    .toString()),
+            _detailRow('Estado',
+                (inv['payment_status_name'] ?? inv['payment_status'] ?? '').toString()),
             if (inv['due_date'] != null)
               _detailRow('Fecha vencimiento', inv['due_date'].toString()),
+            if (canPay && balance > 0) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showPaymentSheet(inv);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Center(
+                      child: Text('Registrar pago',
+                          style: GoogleFonts.publicSans(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showCreateInvoiceSheet() async {
+    // Load required catalogs
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+    );
+
+    List<Map<String, dynamic>> properties = [];
+    List<Map<String, dynamic>> chargeTypes = [];
+    try {
+      final results = await Future.wait([
+        ResidentsService().getProperties(),
+        _service.getChargeTypes(),
+      ]);
+      properties = results[0];
+      chargeTypes = results[1];
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error cargando datos: $e')),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    Navigator.pop(context);
+
+    if (properties.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No hay propiedades disponibles')),
+      );
+      return;
+    }
+
+    final amountCtrl = TextEditingController();
+    final periodCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    String? selectedPropertyId = properties.first['id']?.toString();
+    int? selectedChargeTypeId = chargeTypes.isNotEmpty ? chargeTypes.first['id'] : null;
+    DateTime dueDate = DateTime.now().add(const Duration(days: 30));
+    bool submitting = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(left: 20, right: 20, top: 16, bottom: MediaQuery.of(ctx).viewInsets.bottom + 24),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(2)))),
+                const SizedBox(height: 20),
+                Text('Nueva factura', style: GoogleFonts.publicSans(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                const SizedBox(height: 16),
+                // Property dropdown
+                Text('Propiedad', style: GoogleFonts.publicSans(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                const SizedBox(height: 6),
+                _sheetDropdown<String>(
+                  value: selectedPropertyId,
+                  items: properties.map((p) => DropdownMenuItem(
+                    value: p['id']?.toString(),
+                    child: Text('${p['block'] ?? ''} ${p['number'] ?? ''}'.trim()),
+                  )).toList(),
+                  onChanged: (v) => setSheetState(() => selectedPropertyId = v),
+                ),
+                const SizedBox(height: 12),
+                // Charge type dropdown
+                if (chargeTypes.isNotEmpty) ...[
+                  Text('Tipo de cargo', style: GoogleFonts.publicSans(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                  const SizedBox(height: 6),
+                  _sheetDropdown<int>(
+                    value: selectedChargeTypeId,
+                    items: chargeTypes.map((ct) => DropdownMenuItem(
+                      value: ct['id'] as int,
+                      child: Text(ct['name'] ?? ''),
+                    )).toList(),
+                    onChanged: (v) => setSheetState(() => selectedChargeTypeId = v),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                // Amount
+                _sheetTextField(amountCtrl, 'Monto', keyboardType: TextInputType.number),
+                const SizedBox(height: 12),
+                // Due date
+                Text('Fecha de vencimiento', style: GoogleFonts.publicSans(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                const SizedBox(height: 6),
+                GestureDetector(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: ctx,
+                      initialDate: dueDate,
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                      builder: (c, child) => Theme(data: Theme.of(c).copyWith(colorScheme: const ColorScheme.light(primary: AppColors.primary)), child: child!),
+                    );
+                    if (picked != null) setSheetState(() => dueDate = picked);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFE2E8F0))),
+                    child: Row(
+                      children: [
+                        Expanded(child: Text('${dueDate.day}/${dueDate.month}/${dueDate.year}', style: GoogleFonts.publicSans(fontSize: 14, color: AppColors.textDark))),
+                        const Icon(Icons.calendar_today_rounded, size: 16, color: Color(0xFF94A3B8)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _sheetTextField(periodCtrl, 'Periodo (opcional)', hint: 'Ej: Abril 2026'),
+                const SizedBox(height: 12),
+                _sheetTextField(descCtrl, 'Descripción (opcional)', maxLines: 2),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: GestureDetector(
+                    onTap: submitting ? null : () async {
+                      final amount = double.tryParse(amountCtrl.text.trim());
+                      if (amount == null || amount <= 0) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Ingresa un monto válido')));
+                        return;
+                      }
+                      setSheetState(() => submitting = true);
+                      try {
+                        await _service.createInvoice(
+                          propertyId: selectedPropertyId!,
+                          chargeTypeId: selectedChargeTypeId ?? 1,
+                          amount: amount,
+                          dueDate: '${dueDate.year}-${dueDate.month.toString().padLeft(2, '0')}-${dueDate.day.toString().padLeft(2, '0')}',
+                          billingPeriod: periodCtrl.text.trim().isEmpty ? null : periodCtrl.text.trim(),
+                          description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
+                        );
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        _load();
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Factura creada')));
+                      } on DioException catch (e) {
+                        if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(BillingService.parseError(e))));
+                      } finally {
+                        if (ctx.mounted) setSheetState(() => submitting = false);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(color: submitting ? AppColors.primary.withValues(alpha: 0.5) : AppColors.primary, borderRadius: BorderRadius.circular(10)),
+                      child: Center(
+                        child: submitting
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            : Text('Crear factura', style: GoogleFonts.publicSans(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showPaymentSheet(Map<String, dynamic> inv) async {
+    final balance = (inv['balance'] ?? 0).toDouble();
+    final invoiceId = inv['id']?.toString() ?? '';
+
+    // Load payment methods
+    List<Map<String, dynamic>> methods = [];
+    try {
+      methods = await _service.getPaymentMethods();
+    } catch (_) {
+      // Fallback with a default
+      methods = [{'id': 1, 'name': 'Transferencia'}];
+    }
+
+    if (!mounted) return;
+
+    final amountCtrl = TextEditingController(text: balance.toStringAsFixed(0));
+    final refCtrl = TextEditingController();
+    final notesCtrl = TextEditingController();
+    int selectedMethodId = methods.isNotEmpty ? methods.first['id'] as int : 1;
+    bool submitting = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(left: 20, right: 20, top: 16, bottom: MediaQuery.of(ctx).viewInsets.bottom + 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(2)))),
+              const SizedBox(height: 20),
+              Text('Registrar pago', style: GoogleFonts.publicSans(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+              Text('Saldo pendiente: \$${balance.toStringAsFixed(0)}', style: GoogleFonts.publicSans(fontSize: 13, color: AppColors.textSecondary)),
+              const SizedBox(height: 16),
+              _sheetTextField(amountCtrl, 'Monto', keyboardType: TextInputType.number),
+              const SizedBox(height: 12),
+              Text('Método de pago', style: GoogleFonts.publicSans(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+              const SizedBox(height: 6),
+              _sheetDropdown<int>(
+                value: selectedMethodId,
+                items: methods.map((m) => DropdownMenuItem(value: m['id'] as int, child: Text(m['name'] ?? ''))).toList(),
+                onChanged: (v) { if (v != null) setSheetState(() => selectedMethodId = v); },
+              ),
+              const SizedBox(height: 12),
+              _sheetTextField(refCtrl, 'Referencia (opcional)', hint: 'Ej: #12345'),
+              const SizedBox(height: 12),
+              _sheetTextField(notesCtrl, 'Notas (opcional)'),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: GestureDetector(
+                  onTap: submitting ? null : () async {
+                    final amount = double.tryParse(amountCtrl.text.trim());
+                    if (amount == null || amount <= 0) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Ingresa un monto válido')));
+                      return;
+                    }
+                    setSheetState(() => submitting = true);
+                    try {
+                      await _service.registerPayment(
+                        invoiceId: invoiceId,
+                        amountPaid: amount,
+                        paymentMethodId: selectedMethodId,
+                        reference: refCtrl.text.trim().isEmpty ? null : refCtrl.text.trim(),
+                        notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+                      );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      _load();
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pago registrado')));
+                    } on DioException catch (e) {
+                      if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(BillingService.parseError(e))));
+                    } finally {
+                      if (ctx.mounted) setSheetState(() => submitting = false);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(color: submitting ? AppColors.primary.withValues(alpha: 0.5) : AppColors.primary, borderRadius: BorderRadius.circular(10)),
+                    child: Center(
+                      child: submitting
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : Text('Confirmar pago', style: GoogleFonts.publicSans(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sheetTextField(TextEditingController ctrl, String label, {String? hint, int maxLines = 1, TextInputType? keyboardType}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: GoogleFonts.publicSans(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+        const SizedBox(height: 6),
+        Container(
+          decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFE2E8F0))),
+          child: TextField(
+            controller: ctrl,
+            maxLines: maxLines,
+            keyboardType: keyboardType,
+            style: GoogleFonts.publicSans(fontSize: 14, color: AppColors.textDark),
+            decoration: InputDecoration(
+              hintText: hint ?? label,
+              hintStyle: GoogleFonts.publicSans(fontSize: 14, color: const Color(0xFF94A3B8)),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _sheetDropdown<T>({required T? value, required List<DropdownMenuItem<T>> items, required ValueChanged<T?> onChanged}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFE2E8F0))),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<T>(
+          value: value,
+          isExpanded: true,
+          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF94A3B8)),
+          style: GoogleFonts.publicSans(fontSize: 14, color: AppColors.textDark),
+          items: items,
+          onChanged: onChanged,
         ),
       ),
     );

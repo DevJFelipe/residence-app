@@ -6,8 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_colors.dart';
 import '../login/login_screen.dart';
 import 'tabs/explorar_tab.dart';
-import 'tabs/pagos_tab.dart';
-import 'tabs/avisos_tab.dart';
 import 'tabs/perfil_tab.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -20,11 +18,9 @@ class WelcomeScreen extends StatefulWidget {
 class _WelcomeScreenState extends State<WelcomeScreen> {
   int _currentIndex = 0;
 
-  final _tabs = const [
-    ExplorarTab(),
-    PagosTab(),
-    AvisosTab(),
-    PerfilTab(),
+  final _tabs = [
+    const ExplorarTab(),
+    const PerfilTab(),
   ];
 
   void _goToLogin() {
@@ -151,8 +147,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   Widget _buildBottomNav() {
     final navItems = [
       {'icon': 'assets/icons/wnav_explore.svg', 'label': 'EXPLORAR', 'w': 20.0, 'h': 20.0},
-      {'icon': 'assets/icons/wnav_payments.svg', 'label': 'PAGOS', 'w': 18.0, 'h': 20.0},
-      {'icon': 'assets/icons/wnav_notices.svg', 'label': 'AVISOS', 'w': 16.0, 'h': 20.0},
       {'icon': 'assets/icons/wnav_profile.svg', 'label': 'PERFIL', 'w': 20.0, 'h': 20.0},
     ];
 
