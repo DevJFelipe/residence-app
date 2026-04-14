@@ -1,79 +1,79 @@
 import 'dart:ui';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:residence_app/models/amenity_models.dart';
+import 'package:residence_app/services/amenities_service.dart';
 import 'reservation_screen.dart';
 
-enum AmenityStatus { disponible, mantenimiento }
-
-class _AmenityData {
-  final String image;
-  final String title;
-  final String capacity;
-  final String description;
-  final AmenityStatus status;
-
-  const _AmenityData({
-    required this.image,
-    required this.title,
-    required this.capacity,
-    required this.description,
-    required this.status,
-  });
-}
-
-class AmenitiesScreen extends StatelessWidget {
+class AmenitiesScreen extends StatefulWidget {
   final bool embedded;
   const AmenitiesScreen({super.key, this.embedded = false});
 
+  @override
+  State<AmenitiesScreen> createState() => _AmenitiesScreenState();
+}
+
+class _AmenitiesScreenState extends State<AmenitiesScreen> {
   static const Color _bg = Color(0xFFF7F4EF);
   static const Color _darkText = Color(0xFF0F1B2D);
   static const Color _bodyText = Color(0xFF4A5568);
   static const Color _accent = Color(0xFFC2783A);
 
-  static const List<_AmenityData> _amenities = [
-    _AmenityData(
-      image: 'assets/images/area_pool.png',
-      title: 'Piscina climatizada',
-      capacity: 'Capacidad: 20 personas',
-      description:
-          'Disfruta de una temperatura ideal todo el año en nuestra piscina cubierta con sistema de calefacción ecológico.',
-      status: AmenityStatus.disponible,
-    ),
-    _AmenityData(
-      image: 'assets/images/area_salon.png',
-      title: 'Salón social',
-      capacity: 'Capacidad: 50 personas',
-      description:
-          'Espacio amplio y elegante equipado con mobiliario moderno para tus eventos y celebraciones más especiales.',
-      status: AmenityStatus.disponible,
-    ),
-    _AmenityData(
-      image: 'assets/images/area_tennis.png',
-      title: 'Cancha de tenis',
-      capacity: 'Capacidad: 4 personas',
-      description:
-          'Cancha de polvo de ladrillo reglamentaria con iluminación nocturna. Actualmente en adecuación de drenaje.',
-      status: AmenityStatus.mantenimiento,
-    ),
-    _AmenityData(
-      image: 'assets/images/area_bbq.png',
-      title: 'Zona BBQ',
-      capacity: 'Capacidad: 12 personas',
-      description:
-          'Área campestre equipada con parrilla profesional y zona de comedor al aire libre rodeada de jardines.',
-      status: AmenityStatus.disponible,
-    ),
-    _AmenityData(
-      image: 'assets/images/area_gym.png',
-      title: 'Gimnasio',
-      capacity: 'Capacidad: 8 personas',
-      description:
-          'Equipamiento de última generación para cardio y fuerza, con aire acondicionado y vista al parque central.',
-      status: AmenityStatus.disponible,
-    ),
-  ];
+  final _service = AmenitiesService();
+  List<Amenity> _amenities = [];
+  bool _isLoading = true;
+  String? _error;
+
+  // Map amenity names to local asset images as fallback
+  static const _imageMap = {
+    'piscina': 'assets/images/area_pool.png',
+    'salon': 'assets/images/area_salon.png',
+    'salón': 'assets/images/area_salon.png',
+    'tenis': 'assets/images/area_tennis.png',
+    'cancha': 'assets/images/area_tennis.png',
+    'bbq': 'assets/images/area_bbq.png',
+    'parrilla': 'assets/images/area_bbq.png',
+    'gimnasio': 'assets/images/area_gym.png',
+    'gym': 'assets/images/area_gym.png',
+  };
+
+  String _getImageForAmenity(String name) {
+    final lower = name.toLowerCase();
+    for (final entry in _imageMap.entries) {
+      if (lower.contains(entry.key)) return entry.value;
+    }
+    return 'assets/images/area_salon.png';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAmenities();
+  }
+
+  Future<void> _loadAmenities() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final amenities = await _service.getAmenities();
+      if (!mounted) return;
+      setState(() {
+        _amenities = amenities;
+        _isLoading = false;
+      });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = AmenitiesService.parseError(e);
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,37 +84,78 @@ class AmenitiesScreen extends StatelessWidget {
         body: Stack(
           children: [
             // Scrollable content
-            CustomScrollView(
-              slivers: [
-                // Space for header
-                SliverToBoxAdapter(
-                  child: SizedBox(
-                    height: MediaQuery.of(context).padding.top + 58,
-                  ),
-                ),
-                // Cards list
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        return Padding(
-                          padding: EdgeInsets.only(
-                            bottom: index < _amenities.length - 1 ? 24 : 80,
-                          ),
-                          child: _buildCard(context, _amenities[index]),
-                        );
-                      },
-                      childCount: _amenities.length,
+            RefreshIndicator(
+              onRefresh: _loadAmenities,
+              color: _accent,
+              child: CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: SizedBox(
+                      height: MediaQuery.of(context).padding.top + 58,
                     ),
                   ),
-                ),
-              ],
+                  if (_isLoading)
+                    const SliverFillRemaining(
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (_error != null)
+                    SliverFillRemaining(
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.error_outline,
+                                  size: 48,
+                                  color: _darkText.withValues(alpha: 0.3)),
+                              const SizedBox(height: 16),
+                              Text(_error!,
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.publicSans(
+                                      color: _bodyText)),
+                              const SizedBox(height: 16),
+                              TextButton(
+                                onPressed: _loadAmenities,
+                                child: const Text('Reintentar'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                  else if (_amenities.isEmpty)
+                    SliverFillRemaining(
+                      child: Center(
+                        child: Text(
+                          'No hay áreas comunes disponibles',
+                          style: GoogleFonts.publicSans(color: _bodyText),
+                        ),
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            return Padding(
+                              padding: EdgeInsets.only(
+                                bottom:
+                                    index < _amenities.length - 1 ? 24 : 80,
+                              ),
+                              child:
+                                  _buildCard(context, _amenities[index]),
+                            );
+                          },
+                          childCount: _amenities.length,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
-            // Fixed header
             _buildHeader(context),
-            // Fixed bottom nav (only when standalone)
-            if (!embedded) _buildBottomNav(context),
           ],
         ),
       ),
@@ -130,33 +171,35 @@ class AmenitiesScreen extends StatelessWidget {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
           child: Container(
-            padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
+            padding:
+                EdgeInsets.only(top: MediaQuery.of(context).padding.top),
             decoration: BoxDecoration(
               color: _bg.withValues(alpha: 0.8),
               border: Border(
-                bottom: BorderSide(color: _darkText.withValues(alpha: 0.1)),
+                bottom:
+                    BorderSide(color: _darkText.withValues(alpha: 0.1)),
               ),
             ),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 17),
               child: Row(
                 children: [
-                  // Back button
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).maybePop(),
-                    child: SizedBox(
-                      width: 40,
-                      height: 40,
-                      child: Center(
-                        child: SvgPicture.asset(
-                          'assets/icons/area_back.svg',
-                          width: 16,
-                          height: 16,
+                  if (!widget.embedded)
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).maybePop(),
+                      child: SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: Center(
+                          child: SvgPicture.asset(
+                            'assets/icons/area_back.svg',
+                            width: 16,
+                            height: 16,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
+                  if (!widget.embedded) const SizedBox(width: 16),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -167,16 +210,6 @@ class AmenitiesScreen extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                           height: 25 / 20,
                           color: _darkText,
-                        ),
-                      ),
-                      Text(
-                        'CONJUNTO RESIDENCIAL EL NOGAL',
-                        style: GoogleFonts.publicSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          height: 16 / 12,
-                          letterSpacing: 0.6,
-                          color: _accent,
                         ),
                       ),
                     ],
@@ -190,8 +223,9 @@ class AmenitiesScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCard(BuildContext context, _AmenityData amenity) {
-    final isAvailable = amenity.status == AmenityStatus.disponible;
+  Widget _buildCard(BuildContext context, Amenity amenity) {
+    final isAvailable = amenity.isActive;
+    final image = _getImageForAmenity(amenity.name);
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
@@ -216,7 +250,7 @@ class AmenitiesScreen extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Image.asset(amenity.image, fit: BoxFit.cover),
+                Image.asset(image, fit: BoxFit.cover),
                 Positioned(
                   top: 9,
                   right: 12,
@@ -254,9 +288,8 @@ class AmenitiesScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Title
                   Text(
-                    amenity.title,
+                    amenity.name,
                     style: GoogleFonts.cormorantGaramond(
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
@@ -265,45 +298,62 @@ class AmenitiesScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  // Capacity
-                  Row(
-                    children: [
-                      SvgPicture.asset(
-                        'assets/icons/area_capacity.svg',
-                        width: 14,
-                        height: 7,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        amenity.capacity,
+                  if (amenity.capacity != null)
+                    Row(
+                      children: [
+                        SvgPicture.asset(
+                          'assets/icons/area_capacity.svg',
+                          width: 14,
+                          height: 7,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Capacidad: ${amenity.capacity} personas',
+                          style: GoogleFonts.publicSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                            height: 20 / 14,
+                            color: _bodyText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  if (amenity.description != null)
+                    Padding(
+                      padding:
+                          const EdgeInsets.only(top: 7.25, bottom: 16),
+                      child: Text(
+                        amenity.description!,
                         style: GoogleFonts.publicSans(
                           fontSize: 14,
                           fontWeight: FontWeight.w400,
-                          height: 20 / 14,
+                          height: 22.75 / 14,
                           color: _bodyText,
                         ),
                       ),
-                    ],
-                  ),
-                  // Description
-                  Padding(
-                    padding: const EdgeInsets.only(top: 7.25, bottom: 16),
-                    child: Text(
-                      amenity.description,
-                      style: GoogleFonts.publicSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                        height: 22.75 / 14,
-                        color: _bodyText,
+                    ),
+                  if (amenity.description == null)
+                    const SizedBox(height: 16),
+                  // Pricing info
+                  if (amenity.hourlyCost > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        '\$${amenity.hourlyCost.toStringAsFixed(0)}/hora',
+                        style: GoogleFonts.publicSans(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: _accent,
+                        ),
                       ),
                     ),
-                  ),
                   // Button
                   GestureDetector(
                     onTap: isAvailable
                         ? () => Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (_) => const ReservationScreen(),
+                                builder: (_) =>
+                                    ReservationScreen(amenity: amenity),
                               ),
                             )
                         : null,
@@ -320,7 +370,9 @@ class AmenitiesScreen extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            isAvailable ? 'Reservar ahora' : 'No disponible',
+                            isAvailable
+                                ? 'Reservar ahora'
+                                : 'No disponible',
                             style: GoogleFonts.publicSans(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -347,63 +399,6 @@ class AmenitiesScreen extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildBottomNav(BuildContext context) {
-    final navItems = [
-      {'icon': 'assets/icons/area_nav_home.svg', 'label': 'Inicio', 'active': false, 'w': 16.0, 'h': 18.0},
-      {'icon': 'assets/icons/area_nav_areas.svg', 'label': 'Áreas', 'active': true, 'w': 19.3, 'h': 19.3},
-      {'icon': 'assets/icons/area_nav_reservas.svg', 'label': 'Reservas', 'active': false, 'w': 18.0, 'h': 20.0},
-      {'icon': 'assets/icons/area_nav_perfil.svg', 'label': 'Perfil', 'active': false, 'w': 16.0, 'h': 16.0},
-    ];
-
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(
-            top: BorderSide(color: _darkText.withValues(alpha: 0.1)),
-          ),
-        ),
-        padding: EdgeInsets.only(
-          left: 24,
-          right: 24,
-          top: 9,
-          bottom: 24 + MediaQuery.of(context).padding.bottom,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: navItems.map((item) {
-            final isActive = item['active'] as bool;
-            final color = isActive ? _accent : _bodyText;
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SvgPicture.asset(
-                  item['icon'] as String,
-                  width: item['w'] as double,
-                  height: item['h'] as double,
-                  colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  item['label'] as String,
-                  style: GoogleFonts.publicSans(
-                    fontSize: 10,
-                    fontWeight: isActive ? FontWeight.w500 : FontWeight.w500,
-                    height: 15 / 10,
-                    color: color,
-                  ),
-                ),
-              ],
-            );
-          }).toList(),
-        ),
       ),
     );
   }

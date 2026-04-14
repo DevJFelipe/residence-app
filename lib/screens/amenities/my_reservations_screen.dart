@@ -1,25 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:residence_app/models/amenity_models.dart';
+import 'package:residence_app/services/amenities_service.dart';
 import '../../theme/app_colors.dart';
-
-enum ReservationStatus { confirmada, pendiente, finalizada }
-
-class _ReservationData {
-  final ReservationStatus status;
-  final String title;
-  final String date;
-  final String time;
-  final String image;
-
-  const _ReservationData({
-    required this.status,
-    required this.title,
-    required this.date,
-    required this.time,
-    required this.image,
-  });
-}
 
 class MyReservationsScreen extends StatefulWidget {
   final bool embedded;
@@ -34,48 +19,133 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
   static const Color _dark = Color(0xFF0F1B2D);
   static const Color _accent = Color(0xFFC2783A);
 
+  final _service = AmenitiesService();
+  List<Booking> _bookings = [];
+  bool _isLoading = true;
+  String? _error;
   int _activeTab = 0;
 
-  static const List<_ReservationData> _reservations = [
-    _ReservationData(
-      status: ReservationStatus.confirmada,
-      title: 'Salón Social',
-      date: '15 Oct, 2023',
-      time: '18:00 - 22:00',
-      image: 'assets/images/reserv_salon.png',
-    ),
-    _ReservationData(
-      status: ReservationStatus.pendiente,
-      title: 'Cancha de Tenis',
-      date: '18 Oct, 2023',
-      time: '07:00 - 09:00',
-      image: 'assets/images/reserv_tennis.png',
-    ),
-    _ReservationData(
-      status: ReservationStatus.finalizada,
-      title: 'Piscina Climatizada',
-      date: '10 Oct, 2023',
-      time: '14:00 - 16:00',
-      image: 'assets/images/reserv_pool.png',
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadBookings();
+  }
+
+  Future<void> _loadBookings() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final bookings = await _service.getBookings();
+      if (!mounted) return;
+      setState(() {
+        _bookings = bookings;
+        _isLoading = false;
+      });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = AmenitiesService.parseError(e);
+        _isLoading = false;
+      });
+    }
+  }
+
+  List<Booking> get _filteredBookings {
+    if (_activeTab == 0) {
+      // Próximas: pendiente or aprobada
+      return _bookings.where((b) => b.isUpcoming).toList();
+    } else {
+      // Historial: finalizada, cancelada, rechazada, or past
+      return _bookings.where((b) => !b.isUpcoming).toList();
+    }
+  }
+
+  String _formatDate(DateTime dt) {
+    const months = [
+      'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+      'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
+    ];
+    return '${dt.day} ${months[dt.month - 1]}, ${dt.year}';
+  }
+
+  String _formatTime(DateTime start, DateTime end) {
+    String fmt(DateTime dt) {
+      final h = dt.hour.toString().padLeft(2, '0');
+      final m = dt.minute.toString().padLeft(2, '0');
+      return '$h:$m';
+    }
+    return '${fmt(start)} - ${fmt(end)}';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final filtered = _filteredBookings;
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
         children: [
           _buildHeader(context),
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 49),
-              itemCount: _reservations.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 16),
-              itemBuilder: (context, index) => _buildCard(_reservations[index]),
+            child: RefreshIndicator(
+              onRefresh: _loadBookings,
+              color: _accent,
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.error_outline,
+                                    size: 48,
+                                    color: _dark.withValues(alpha: 0.3)),
+                                const SizedBox(height: 16),
+                                Text(_error!,
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.dmSans(
+                                        color: const Color(0xFF64748B))),
+                                const SizedBox(height: 16),
+                                TextButton(
+                                  onPressed: _loadBookings,
+                                  child: const Text('Reintentar'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : filtered.isEmpty
+                          ? ListView(
+                              children: [
+                                SizedBox(
+                                  height:
+                                      MediaQuery.of(context).size.height * 0.3,
+                                  child: Center(
+                                    child: Text(
+                                      _activeTab == 0
+                                          ? 'No tienes reservas próximas'
+                                          : 'No tienes historial de reservas',
+                                      style: GoogleFonts.dmSans(
+                                          color: const Color(0xFF64748B)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : ListView.separated(
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 16, 16, 49),
+                              itemCount: filtered.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 16),
+                              itemBuilder: (context, index) =>
+                                  _buildCard(filtered[index]),
+                            ),
             ),
           ),
-          if (!widget.embedded) _buildBottomNav(context),
         ],
       ),
     );
@@ -92,46 +162,41 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
         padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
         child: Column(
           children: [
-            // Title row
             Row(
               children: [
-                GestureDetector(
-                  onTap: () => Navigator.of(context).maybePop(),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: SvgPicture.asset('assets/icons/myres_back.svg', width: 16, height: 16),
+                if (!widget.embedded)
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).maybePop(),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: SvgPicture.asset('assets/icons/myres_back.svg',
+                          width: 16, height: 16),
+                    ),
                   ),
-                ),
                 Expanded(
                   child: Center(
                     child: Text(
                       'Mis Reservas',
                       style: GoogleFonts.cormorantGaramond(
-                        fontSize: 24, fontWeight: FontWeight.w700, height: 32 / 24, color: _dark,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        height: 32 / 24,
+                        color: _dark,
                       ),
                     ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: SvgPicture.asset('assets/icons/myres_search.svg', width: 18, height: 18),
-                ),
+                if (!widget.embedded)
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: SvgPicture.asset('assets/icons/myres_search.svg',
+                        width: 18, height: 18),
+                  )
+                else
+                  const SizedBox(width: 32),
               ],
             ),
-            const SizedBox(height: 8),
-            // Subtitle
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                'CONJUNTO RESIDENCIAL EL NOGAL',
-                style: GoogleFonts.dmSans(
-                  fontSize: 14, fontWeight: FontWeight.w500, height: 20 / 14,
-                  letterSpacing: 1.4, color: _accent,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            // Tabs
+            const SizedBox(height: 16),
             Row(
               children: [
                 _buildTab('Próximas', 0),
@@ -175,26 +240,37 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
     );
   }
 
-  Widget _buildCard(_ReservationData reservation) {
-    final isFinished = reservation.status == ReservationStatus.finalizada;
+  Widget _buildCard(Booking booking) {
+    final isFinished = booking.isFinalizada || booking.isCancelada || booking.isRechazada;
 
     late Color badgeBg;
     late Color badgeText;
     late String badgeLabel;
 
-    switch (reservation.status) {
-      case ReservationStatus.confirmada:
-        badgeBg = const Color(0xFFDCFCE7);
-        badgeText = const Color(0xFF15803D);
-        badgeLabel = 'CONFIRMADA';
-      case ReservationStatus.pendiente:
-        badgeBg = const Color(0xFFFEF3C7);
-        badgeText = const Color(0xFFB45309);
-        badgeLabel = 'PENDIENTE';
-      case ReservationStatus.finalizada:
-        badgeBg = const Color(0xFFE2E8F0);
-        badgeText = const Color(0xFF475569);
-        badgeLabel = 'FINALIZADA';
+    if (booking.isAprobada) {
+      badgeBg = const Color(0xFFDCFCE7);
+      badgeText = const Color(0xFF15803D);
+      badgeLabel = 'APROBADA';
+    } else if (booking.isPendiente) {
+      badgeBg = const Color(0xFFFEF3C7);
+      badgeText = const Color(0xFFB45309);
+      badgeLabel = 'PENDIENTE';
+    } else if (booking.isFinalizada) {
+      badgeBg = const Color(0xFFE2E8F0);
+      badgeText = const Color(0xFF475569);
+      badgeLabel = 'FINALIZADA';
+    } else if (booking.isCancelada) {
+      badgeBg = const Color(0xFFFEE2E2);
+      badgeText = const Color(0xFFDC2626);
+      badgeLabel = 'CANCELADA';
+    } else if (booking.isRechazada) {
+      badgeBg = const Color(0xFFFEE2E2);
+      badgeText = const Color(0xFFDC2626);
+      badgeLabel = 'RECHAZADA';
+    } else {
+      badgeBg = const Color(0xFFE2E8F0);
+      badgeText = const Color(0xFF475569);
+      badgeLabel = booking.bookingStatusName?.toUpperCase() ?? 'DESCONOCIDO';
     }
 
     return Opacity(
@@ -206,244 +282,111 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.borderLight),
           boxShadow: const [
-            BoxShadow(color: Color(0x0D000000), blurRadius: 2, offset: Offset(0, 1)),
+            BoxShadow(
+                color: Color(0x0D000000),
+                blurRadius: 2,
+                offset: Offset(0, 1)),
           ],
         ),
-        child: Row(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Left content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: badgeBg,
-                      borderRadius: BorderRadius.circular(9999),
-                    ),
-                    child: Text(
-                      badgeLabel,
-                      style: GoogleFonts.dmSans(
-                        fontSize: 10, fontWeight: FontWeight.w700, height: 15 / 10, color: badgeText,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  // Title
-                  Text(
-                    reservation.title,
-                    style: GoogleFonts.cormorantGaramond(
-                      fontSize: 20, fontWeight: FontWeight.w700, height: 25 / 20, color: _dark,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  // Date
-                  Row(
-                    children: [
-                      SvgPicture.asset('assets/icons/myres_calendar.svg', width: 10.5, height: 11.667),
-                      const SizedBox(width: 4),
-                      Text(
-                        reservation.date,
-                        style: GoogleFonts.dmSans(
-                          fontSize: 14, fontWeight: FontWeight.w400, height: 20 / 14, color: const Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                  // Time
-                  Row(
-                    children: [
-                      SvgPicture.asset('assets/icons/myres_clock.svg', width: 11.667, height: 11.667),
-                      const SizedBox(width: 4),
-                      Text(
-                        reservation.time,
-                        style: GoogleFonts.dmSans(
-                          fontSize: 14, fontWeight: FontWeight.w400, height: 20 / 14, color: const Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // Button
-                  GestureDetector(
-                    onTap: () {
-                      showModalBottomSheet(
-                        context: context,
-                        backgroundColor: Colors.transparent,
-                        builder: (ctx) => Container(
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.only(
-                              topLeft: Radius.circular(24),
-                              topRight: Radius.circular(24),
-                            ),
-                          ),
-                          child: SafeArea(
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 40, height: 4,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFE2E8F0),
-                                      borderRadius: BorderRadius.circular(2),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    reservation.title,
-                                    style: GoogleFonts.cormorantGaramond(
-                                      fontSize: 24, fontWeight: FontWeight.w700, height: 32 / 24, color: _dark,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.calendar_today, size: 16, color: Color(0xFF64748B)),
-                                      const SizedBox(width: 8),
-                                      Text('Fecha: ${reservation.date}', style: GoogleFonts.dmSans(fontSize: 14, color: const Color(0xFF64748B))),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.access_time, size: 16, color: Color(0xFF64748B)),
-                                      const SizedBox(width: 8),
-                                      Text('Horario: ${reservation.time}', style: GoogleFonts.dmSans(fontSize: 14, color: const Color(0xFF64748B))),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.info_outline, size: 16, color: Color(0xFF64748B)),
-                                      const SizedBox(width: 8),
-                                      Text('Estado: ${reservation.status.name.toUpperCase()}', style: GoogleFonts.dmSans(fontSize: 14, color: const Color(0xFF64748B))),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 24),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: ElevatedButton(
-                                      onPressed: () => Navigator.of(ctx).pop(),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: _dark,
-                                        foregroundColor: Colors.white,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                      ),
-                                      child: const Text('Cerrar'),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isFinished ? 17 : 16,
-                        vertical: isFinished ? 9 : 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isFinished ? null : _dark,
-                        borderRadius: BorderRadius.circular(8),
-                        border: isFinished ? Border.all(color: _dark) : null,
-                      ),
-                      child: Text(
-                        'VER DETALLES',
-                        style: GoogleFonts.dmSans(
-                          fontSize: 12, fontWeight: FontWeight.w700, height: 16 / 12,
-                          letterSpacing: 0.6, color: isFinished ? _dark : Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+            // Badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: badgeBg,
+                borderRadius: BorderRadius.circular(9999),
               ),
-            ),
-            const SizedBox(width: 16),
-            // Thumbnail
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: ColorFiltered(
-                colorFilter: isFinished
-                    ? const ColorFilter.mode(Colors.white, BlendMode.saturation)
-                    : const ColorFilter.mode(Colors.transparent, BlendMode.dst),
-                child: Image.asset(
-                  reservation.image,
-                  width: 96,
-                  height: 96,
-                  fit: BoxFit.cover,
+              child: Text(
+                badgeLabel,
+                style: GoogleFonts.dmSans(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  height: 15 / 10,
+                  color: badgeText,
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomNav(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _dark,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(16),
-          topRight: Radius.circular(16),
-        ),
-      ),
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
-      child: SizedBox(
-        height: 112,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            // Nav items
-            Positioned.fill(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _navItem('assets/icons/mrnav_home.svg', 'INICIO', false, 16, 18),
-                    _navItem('assets/icons/mrnav_reservas.svg', 'RESERVAS', true, 18, 20),
-                    const SizedBox(width: 58), // FAB space
-                    _navItem('assets/icons/mrnav_pagos.svg', 'PAGOS', false, 22, 16),
-                    _navItem('assets/icons/mrnav_perfil.svg', 'PERFIL', false, 16, 16),
-                  ],
-                ),
+            const SizedBox(height: 4),
+            // Title
+            Text(
+              booking.amenityName ?? 'Reserva',
+              style: GoogleFonts.cormorantGaramond(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                height: 25 / 20,
+                color: _dark,
               ),
             ),
-            // FAB
-            Positioned(
-              left: 0,
-              right: 0,
-              top: -20,
-              child: Center(
-                child: Container(
-                  width: 58,
-                  height: 58,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: _dark, width: 4),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x66EC5B13),
-                        blurRadius: 15,
-                        offset: Offset(0, 10),
-                        spreadRadius: -3,
-                      ),
-                    ],
+            const SizedBox(height: 4),
+            // Date
+            Row(
+              children: [
+                SvgPicture.asset('assets/icons/myres_calendar.svg',
+                    width: 10.5, height: 11.667),
+                const SizedBox(width: 4),
+                Text(
+                  _formatDate(booking.startTime),
+                  style: GoogleFonts.dmSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    height: 20 / 14,
+                    color: const Color(0xFF64748B),
                   ),
-                  child: Center(
-                    child: SvgPicture.asset('assets/icons/mrnav_fab.svg', width: 20, height: 20),
+                ),
+              ],
+            ),
+            // Time
+            Row(
+              children: [
+                SvgPicture.asset('assets/icons/myres_clock.svg',
+                    width: 11.667, height: 11.667),
+                const SizedBox(width: 4),
+                Text(
+                  _formatTime(booking.startTime, booking.endTime),
+                  style: GoogleFonts.dmSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    height: 20 / 14,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+            if (booking.totalCost > 0) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Costo: \$${booking.totalCost.toStringAsFixed(0)}',
+                style: GoogleFonts.dmSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: _accent,
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            // Detail button
+            GestureDetector(
+              onTap: () => _showDetail(booking),
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isFinished ? 17 : 16,
+                  vertical: isFinished ? 9 : 8,
+                ),
+                decoration: BoxDecoration(
+                  color: isFinished ? null : _dark,
+                  borderRadius: BorderRadius.circular(8),
+                  border: isFinished ? Border.all(color: _dark) : null,
+                ),
+                child: Text(
+                  'VER DETALLES',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    height: 16 / 12,
+                    letterSpacing: 0.6,
+                    color: isFinished ? _dark : Colors.white,
                   ),
                 ),
               ),
@@ -454,19 +397,91 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
     );
   }
 
-  Widget _navItem(String icon, String label, bool active, double w, double h) {
-    final color = active ? Colors.white : const Color(0xFF94A3B8);
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        SvgPicture.asset(icon, width: w, height: h, colorFilter: ColorFilter.mode(color, BlendMode.srcIn)),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: GoogleFonts.dmSans(
-            fontSize: 10, fontWeight: FontWeight.w500, height: 15 / 10,
-            letterSpacing: -0.5, color: color,
+  void _showDetail(Booking booking) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
           ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE2E8F0),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  booking.amenityName ?? 'Reserva',
+                  style: GoogleFonts.cormorantGaramond(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    height: 32 / 24,
+                    color: _dark,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _detailRow(Icons.calendar_today,
+                    'Fecha: ${_formatDate(booking.startTime)}'),
+                const SizedBox(height: 8),
+                _detailRow(Icons.access_time,
+                    'Horario: ${_formatTime(booking.startTime, booking.endTime)}'),
+                const SizedBox(height: 8),
+                _detailRow(Icons.info_outline,
+                    'Estado: ${booking.bookingStatusName?.toUpperCase() ?? "N/A"}'),
+                if (booking.totalCost > 0) ...[
+                  const SizedBox(height: 8),
+                  _detailRow(Icons.attach_money,
+                      'Costo: \$${booking.totalCost.toStringAsFixed(0)}'),
+                ],
+                if (booking.notes != null && booking.notes!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  _detailRow(Icons.note_outlined, 'Notas: ${booking.notes}'),
+                ],
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _dark,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text('Cerrar'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _detailRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: const Color(0xFF64748B)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(text,
+              style: GoogleFonts.dmSans(
+                  fontSize: 14, color: const Color(0xFF64748B))),
         ),
       ],
     );

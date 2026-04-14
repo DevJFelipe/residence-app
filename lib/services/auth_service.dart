@@ -60,6 +60,9 @@ class AuthService {
   /// Parse a Dio error into a user-friendly message.
   static String parseError(DioException e) {
     if (e.response?.data is Map) {
+      // FastAPI HTTPException format: {"detail": "..."}
+      final detail = e.response!.data['detail'];
+      if (detail is String) return detail;
       final error = e.response!.data['error'];
       if (error is Map && error['message'] != null) {
         return error['message'];
