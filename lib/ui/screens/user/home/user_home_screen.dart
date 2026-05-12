@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:residence_app/core/api_client.dart';
 import 'package:residence_app/core/session_manager.dart';
 import 'package:residence_app/core/theme/app_colors.dart';
+import 'package:residence_app/core/theme/app_decorations.dart';
 import 'package:residence_app/models/amenity_models.dart';
 import 'package:residence_app/services/amenities_service.dart';
 import 'package:residence_app/services/billing_service.dart';
@@ -52,7 +54,6 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
           .split(' ')
           .first;
 
-      // Each call independent so one failure doesn't block the rest
       List<Map<String, dynamic>> invoices = [];
       List<Booking> allBookings = [];
       List<Map<String, dynamic>> pqrs = [];
@@ -115,67 +116,82 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
   }
 
   String _formatBookingDate(DateTime dt) {
+    final local = dt.toLocal();
     final weekdays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
     final months = [
       'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
       'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
     ];
-    return '${weekdays[dt.weekday - 1]}, ${dt.day} ${months[dt.month - 1]}';
+    return '${weekdays[local.weekday - 1]}, ${local.day} ${months[local.month - 1]}';
   }
 
   String _formatTime(DateTime dt) {
-    final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
-    final period = dt.hour >= 12 ? 'PM' : 'AM';
-    return '$hour:${dt.minute.toString().padLeft(2, '0')} $period';
+    final local = dt.toLocal();
+    final hour = local.hour > 12 ? local.hour - 12 : (local.hour == 0 ? 12 : local.hour);
+    final period = local.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:${local.minute.toString().padLeft(2, '0')} $period';
+  }
+
+  String _greeting() {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'Buenos días';
+    if (h < 19) return 'Buenas tardes';
+    return 'Buenas noches';
   }
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(_error!,
-                          style: GoogleFonts.publicSans(color: Colors.grey)),
-                      const SizedBox(height: 12),
-                      TextButton(
-                          onPressed: _load, child: const Text('Reintentar')),
-                    ],
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+    return Container(
+      color: AppColors.surfaceWarm,
+      child: SafeArea(
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+                ? Center(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildWelcomeHeader(),
-                        const SizedBox(height: 24),
-                        _buildMiniStatCards(),
-                        if (_pendingInvoices.isNotEmpty) ...[
-                          const SizedBox(height: 24),
-                          _buildNextPaymentCard(),
-                        ],
-                        if (_upcomingBookings.isNotEmpty) ...[
-                          const SizedBox(height: 28),
-                          _buildUpcomingReservations(),
-                        ],
-                        if (_notifications.isNotEmpty) ...[
-                          const SizedBox(height: 28),
-                          _buildNotifications(),
-                        ],
-                        const SizedBox(height: 28),
-                        _buildQuickActions(),
+                        Text(_error!,
+                            style: GoogleFonts.publicSans(
+                                color: AppColors.textMutedWarm)),
+                        const SizedBox(height: 12),
+                        TextButton(
+                            onPressed: _load,
+                            child: const Text('Reintentar')),
                       ],
                     ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _load,
+                    color: AppColors.primary,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(20, 32, 20, 40),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildWelcomeHeader(),
+                          const SizedBox(height: 28),
+                          _buildMiniStatCards(),
+                          if (_pendingInvoices.isNotEmpty) ...[
+                            const SizedBox(height: 24),
+                            _buildNextPaymentCard(),
+                          ],
+                          if (_upcomingBookings.isNotEmpty) ...[
+                            const SizedBox(height: 32),
+                            _buildUpcomingReservations(),
+                          ],
+                          if (_notifications.isNotEmpty) ...[
+                            const SizedBox(height: 32),
+                            _buildNotifications(),
+                          ],
+                          const SizedBox(height: 32),
+                          _buildQuickActions(),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+      ),
     );
   }
 
@@ -183,23 +199,61 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                    spreadRadius: -4,
+                  ),
+                ],
+              ),
+              child: Center(
+                child: SvgPicture.asset(
+                  'assets/icons/welcome_logo.svg',
+                  width: 19,
+                  height: 19,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              'Residence',
+              style: GoogleFonts.publicSans(
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.5,
+                color: AppColors.textDarkWarm,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
         Text(
-          'Bienvenido, $_userName',
+          '${_greeting()},',
           style: GoogleFonts.publicSans(
-            fontSize: 24,
-            fontWeight: FontWeight.w700,
-            height: 32 / 24,
-            color: AppColors.textDark,
+            fontSize: 15,
+            fontWeight: FontWeight.w400,
+            color: AppColors.textMutedWarm,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 2),
         Text(
-          'Residence',
+          '$_userName.',
           style: GoogleFonts.publicSans(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 0.3,
-            color: AppColors.textSecondary,
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+            height: 1.15,
+            letterSpacing: -0.5,
+            color: AppColors.textDarkWarm,
           ),
         ),
       ],
@@ -207,34 +261,42 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
   }
 
   Widget _buildMiniStatCards() {
-    return Row(
-      children: [
-        Expanded(
-          child: _MiniStatCard(
-            label: 'Pagos\npendientes',
-            value: '${_pendingInvoices.length}',
-            color: _pendingInvoices.isEmpty
-                ? AppColors.success
-                : AppColors.warning,
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: _MiniStatCard(
+              icon: Icons.receipt_long_rounded,
+              label: 'Pagos pendientes',
+              value: '${_pendingInvoices.length}',
+              statusColor: _pendingInvoices.isEmpty
+                  ? AppColors.success
+                  : AppColors.warning,
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _MiniStatCard(
-            label: 'Reservas\nactivas',
-            value: '${_upcomingBookings.length}',
-            color: AppColors.info,
+          const SizedBox(width: 10),
+          Expanded(
+            child: _MiniStatCard(
+              icon: Icons.event_available_rounded,
+              label: 'Reservas activas',
+              value: '${_upcomingBookings.length}',
+              statusColor: AppColors.primary,
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _MiniStatCard(
-            label: 'PQRS\nabiertas',
-            value: '$_openPqrsCount',
-            color: _openPqrsCount == 0 ? AppColors.success : AppColors.warning,
+          const SizedBox(width: 10),
+          Expanded(
+            child: _MiniStatCard(
+              icon: Icons.assignment_rounded,
+              label: 'PQRS abiertas',
+              value: '$_openPqrsCount',
+              statusColor: _openPqrsCount == 0
+                  ? AppColors.success
+                  : AppColors.warning,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -248,72 +310,69 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
         : '';
 
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderLight),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0D000000),
-            blurRadius: 2,
-            offset: Offset(0, 1),
-          ),
-        ],
-      ),
+      decoration: AppDecorations.premiumCard(radius: 20),
+      clipBehavior: Clip.antiAlias,
       child: Row(
         children: [
           Container(
-            width: 4,
-            height: 110,
-            decoration: const BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(12),
-                bottomLeft: Radius.circular(12),
-              ),
-            ),
+            width: 6,
+            height: 140,
+            color: AppColors.primary,
           ),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Próximo pago',
+                    'PRÓXIMO PAGO',
                     style: GoogleFonts.publicSans(
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                      color: AppColors.textSecondary,
+                      letterSpacing: 1.4,
+                      color: AppColors.primary,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Text(
-                    '$chargeType${period.isNotEmpty ? ' - $period' : ''}',
+                    '$chargeType${period.isNotEmpty ? ' · $period' : ''}',
                     style: GoogleFonts.publicSans(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textDark,
+                      color: AppColors.textMutedWarm,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Text(
                     _formatCurrency(amount),
                     style: GoogleFonts.publicSans(
-                      fontSize: 22,
+                      fontSize: 30,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textDark,
+                      letterSpacing: -0.6,
+                      color: AppColors.textDarkWarm,
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
                   if (dueDate.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Vence: $dueDate',
-                      style: GoogleFonts.publicSans(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.calendar_today_rounded,
+                          size: 13,
+                          color: AppColors.textMutedWarm,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Vence · $dueDate',
+                          style: GoogleFonts.publicSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textMutedWarm,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ],
@@ -326,29 +385,13 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
   }
 
   Widget _buildUpcomingReservations() {
-    final colors = [
-      const Color(0xFFFFF7ED),
-      const Color(0xFFEFF6FF),
-      const Color(0xFFF0FDF4),
-      const Color(0xFFFDF4FF),
-    ];
-    final iconColors = [
-      AppColors.primary,
-      AppColors.info,
-      AppColors.success,
-      const Color(0xFF8B5CF6),
-    ];
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Reservas próximas',
-            style: GoogleFonts.publicSans(
-                fontSize: 16, fontWeight: FontWeight.w700,
-                color: AppColors.textDark)),
-        const SizedBox(height: 12),
+        _SectionHeader(title: 'Reservas próximas'),
+        const SizedBox(height: 14),
         SizedBox(
-          height: 160,
+          height: 168,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: _upcomingBookings.length,
@@ -360,9 +403,8 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                 date: _formatBookingDate(b.startTime),
                 time:
                     '${_formatTime(b.startTime)} - ${_formatTime(b.endTime)}',
-                color: colors[i % colors.length],
-                iconColor: iconColors[i % iconColors.length],
                 status: b.bookingStatusName,
+                isApproved: b.isAprobada,
               );
             },
           ),
@@ -375,25 +417,11 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Notificaciones recientes',
-            style: GoogleFonts.publicSans(
-                fontSize: 16, fontWeight: FontWeight.w700,
-                color: AppColors.textDark)),
-        const SizedBox(height: 12),
+        _SectionHeader(title: 'Notificaciones recientes'),
+        const SizedBox(height: 14),
         Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.cardBackground,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.borderLight),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x0D000000),
-                blurRadius: 2,
-                offset: Offset(0, 1),
-              ),
-            ],
-          ),
+          padding: const EdgeInsets.all(18),
+          decoration: AppDecorations.premiumCard(radius: 16),
           child: Column(
             children: List.generate(_notifications.length, (i) {
               final n = _notifications[i];
@@ -403,44 +431,59 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
               return Column(
                 children: [
                   if (i > 0)
-                    const Divider(height: 24, color: AppColors.borderLight),
+                    Divider(
+                      height: 24,
+                      thickness: 1,
+                      color: AppColors.borderSubtle,
+                    ),
                   Row(
                     children: [
                       Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
+                        width: 40,
+                        height: 40,
+                        decoration: AppDecorations.iconTile(
+                          tint: AppColors.primary,
                         ),
-                        child: const Icon(Icons.notifications_outlined,
-                            size: 18, color: AppColors.primary),
+                        child: const Icon(
+                          Icons.notifications_outlined,
+                          size: 20,
+                          color: AppColors.primary,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(title.toString(),
-                                style: GoogleFonts.publicSans(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textDark)),
+                            Text(
+                              title.toString(),
+                              style: GoogleFonts.publicSans(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textDarkWarm,
+                              ),
+                            ),
                             if (body.toString().isNotEmpty)
-                              Text(body.toString(),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.publicSans(
-                                      fontSize: 12,
-                                      color: AppColors.textSecondary)),
+                              Text(
+                                body.toString(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.publicSans(
+                                  fontSize: 12,
+                                  color: AppColors.textMutedWarm,
+                                ),
+                              ),
                           ],
                         ),
                       ),
                       if (createdAt != null)
-                        Text(_formatDate(createdAt.toString()),
-                            style: GoogleFonts.publicSans(
-                                fontSize: 11,
-                                color: AppColors.textSecondary)),
+                        Text(
+                          _formatDate(createdAt.toString()),
+                          style: GoogleFonts.publicSans(
+                            fontSize: 11,
+                            color: AppColors.textMutedWarm,
+                          ),
+                        ),
                     ],
                   ),
                 ],
@@ -456,19 +499,16 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Acciones rápidas',
-            style: GoogleFonts.publicSans(
-                fontSize: 16, fontWeight: FontWeight.w700,
-                color: AppColors.textDark)),
-        const SizedBox(height: 12),
+        _SectionHeader(title: 'Acciones rápidas'),
+        const SizedBox(height: 14),
         Row(
           children: [
             Expanded(
               child: _QuickActionCard(
                 icon: Icons.calendar_month_rounded,
                 label: 'Reservar área',
-                color: AppColors.info,
-                bgColor: const Color(0xFFEFF6FF),
+                subtitle: 'Espacios comunes',
+                tint: AppColors.primary,
                 onTap: () => widget.onSwitchTab?.call(1),
               ),
             ),
@@ -477,8 +517,8 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
               child: _QuickActionCard(
                 icon: Icons.event_available_rounded,
                 label: 'Mis reservas',
-                color: AppColors.success,
-                bgColor: const Color(0xFFF0FDF4),
+                subtitle: 'Historial y próximas',
+                tint: AppColors.success,
                 onTap: () => widget.onSwitchTab?.call(2),
               ),
             ),
@@ -491,8 +531,8 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
               child: _QuickActionCard(
                 icon: Icons.people_alt_rounded,
                 label: 'Visitantes',
-                color: const Color(0xFF8B5CF6),
-                bgColor: const Color(0xFFFDF4FF),
+                subtitle: 'Registra tus invitados',
+                tint: const Color(0xFF8B5CF6),
                 onTap: () => widget.onSwitchTab?.call(3),
               ),
             ),
@@ -501,12 +541,13 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
               child: _QuickActionCard(
                 icon: Icons.assignment_rounded,
                 label: 'Mis PQRS',
-                color: AppColors.warning,
-                bgColor: const Color(0xFFFFFBEB),
+                subtitle: 'Consulta y crea',
+                tint: AppColors.warning,
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (_) => const UserPqrsScreen()),
+                    builder: (_) => const UserPqrsScreen(),
+                  ),
                 ),
               ),
             ),
@@ -517,53 +558,82 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
   }
 }
 
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: GoogleFonts.publicSans(
+        fontSize: 20,
+        fontWeight: FontWeight.w700,
+        height: 1.2,
+        letterSpacing: -0.3,
+        color: AppColors.textDarkWarm,
+      ),
+    );
+  }
+}
+
 class _MiniStatCard extends StatelessWidget {
+  final IconData icon;
   final String label;
   final String value;
-  final Color color;
+  final Color statusColor;
 
   const _MiniStatCard({
+    required this.icon,
     required this.label,
     required this.value,
-    required this.color,
+    required this.statusColor,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderLight),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0D000000),
-            blurRadius: 2,
-            offset: Offset(0, 1),
-          ),
-        ],
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+      decoration: AppDecorations.premiumCard(radius: 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            value,
-            style: GoogleFonts.publicSans(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
+          Container(
+            width: 34,
+            height: 34,
+            decoration: AppDecorations.iconTile(tint: statusColor),
+            child: Icon(icon, size: 17, color: statusColor),
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: GoogleFonts.publicSans(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              height: 1.3,
-              color: AppColors.textSecondary,
-            ),
+          const SizedBox(height: 18),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: GoogleFonts.publicSans(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w700,
+                  height: 1,
+                  letterSpacing: -0.8,
+                  color: AppColors.textDarkWarm,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.publicSans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  height: 1.3,
+                  letterSpacing: 0.1,
+                  color: AppColors.textMutedWarm,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -575,28 +645,26 @@ class _ReservationPreviewCard extends StatelessWidget {
   final String title;
   final String date;
   final String time;
-  final Color color;
-  final Color iconColor;
   final String? status;
+  final bool isApproved;
 
   const _ReservationPreviewCard({
     required this.title,
     required this.date,
     required this.time,
-    required this.color,
-    required this.iconColor,
     this.status,
+    this.isApproved = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final badgeColor = isApproved ? AppColors.success : AppColors.warning;
     return Container(
-      width: 200,
+      width: 208,
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderLight),
+      decoration: AppDecorations.premiumCard(
+        color: AppColors.surfaceWarmElevated,
+        radius: 16,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -604,13 +672,14 @@ class _ReservationPreviewCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
+                width: 40,
+                height: 40,
+                decoration: AppDecorations.iconTile(tint: AppColors.primary),
+                child: const Icon(
+                  Icons.event_rounded,
+                  size: 20,
+                  color: AppColors.primary,
                 ),
-                child: Icon(Icons.event_rounded, size: 20, color: iconColor),
               ),
               if (status != null) ...[
                 const Spacer(),
@@ -618,36 +687,42 @@ class _ReservationPreviewCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: iconColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(6),
+                    color: badgeColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999),
                   ),
-                  child: Text(status!,
-                      style: GoogleFonts.publicSans(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: iconColor)),
+                  child: Text(
+                    status!,
+                    style: GoogleFonts.publicSans(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.3,
+                      color: badgeColor,
+                    ),
+                  ),
                 ),
               ],
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Text(
             title,
             style: GoogleFonts.publicSans(
-              fontSize: 14,
+              fontSize: 15,
               fontWeight: FontWeight.w700,
-              color: AppColors.textDark,
+              height: 1.25,
+              letterSpacing: -0.3,
+              color: AppColors.textDarkWarm,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             date,
             style: GoogleFonts.publicSans(
               fontSize: 13,
               fontWeight: FontWeight.w500,
-              color: AppColors.textSecondary,
+              color: AppColors.textMutedWarm,
             ),
           ),
           const SizedBox(height: 2),
@@ -655,7 +730,8 @@ class _ReservationPreviewCard extends StatelessWidget {
             time,
             style: GoogleFonts.publicSans(
               fontSize: 12,
-              color: AppColors.textSecondary,
+              color: AppColors.textMutedWarm,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
         ],
@@ -667,15 +743,15 @@ class _ReservationPreviewCard extends StatelessWidget {
 class _QuickActionCard extends StatelessWidget {
   final IconData icon;
   final String label;
-  final Color color;
-  final Color bgColor;
+  final String subtitle;
+  final Color tint;
   final VoidCallback? onTap;
 
   const _QuickActionCard({
     required this.icon,
     required this.label,
-    required this.color,
-    required this.bgColor,
+    required this.subtitle,
+    required this.tint,
     this.onTap,
   });
 
@@ -683,35 +759,50 @@ class _QuickActionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: Container(
         padding: const EdgeInsets.all(16),
-        height: 100,
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.borderLight),
-        ),
+        height: 124,
+        decoration: AppDecorations.premiumCard(radius: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, size: 20, color: color),
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: AppDecorations.iconTile(tint: tint),
+                  child: Icon(icon, size: 20, color: tint),
+                ),
+                const Spacer(),
+                const Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 18,
+                  color: AppColors.primary,
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
+            const Spacer(),
             Text(
               label,
               style: GoogleFonts.publicSans(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textDark,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.2,
+                color: AppColors.textDarkWarm,
               ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: GoogleFonts.publicSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textMutedWarm,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

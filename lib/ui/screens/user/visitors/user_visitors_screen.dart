@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:residence_app/core/api_client.dart';
 import 'package:residence_app/core/session_manager.dart';
 import 'package:residence_app/core/theme/app_colors.dart';
+import 'package:residence_app/core/theme/app_decorations.dart';
 import 'package:residence_app/core/theme/app_text_styles.dart';
 
 class UserVisitorsScreen extends StatefulWidget {
@@ -195,67 +196,72 @@ class _UserVisitorsScreenState extends State<UserVisitorsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Column(
-        children: [
-          _buildHeader(),
-          Expanded(
-            child: _loading
-                ? const Center(
-                    child: CircularProgressIndicator(color: AppColors.primary))
-                : _error != null
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(_error!, style: AppTextStyles.bodyMedium),
-                            const SizedBox(height: 12),
-                            GestureDetector(
-                              onTap: _load,
-                              child: Text('Reintentar',
-                                  style: AppTextStyles.bold14
-                                      .copyWith(color: AppColors.primary)),
-                            ),
-                          ],
-                        ),
-                      )
-                    : RefreshIndicator(
-                        color: AppColors.primary,
-                        onRefresh: _load,
-                        child: ListView(
-                          padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
-                          children: [
-                            _buildRegisterForm(),
-                            if (_pendingVisitors.isNotEmpty) ...[
-                              const SizedBox(height: 24),
-                              _buildPendingSection(),
+    return Container(
+      color: AppColors.surfaceWarm,
+      child: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(),
+            Expanded(
+              child: _loading
+                  ? const Center(
+                      child:
+                          CircularProgressIndicator(color: AppColors.primary))
+                  : _error != null
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(_error!, style: AppTextStyles.bodyMedium),
+                              const SizedBox(height: 12),
+                              GestureDetector(
+                                onTap: _load,
+                                child: Text('Reintentar',
+                                    style: AppTextStyles.bold14
+                                        .copyWith(color: AppColors.primary)),
+                              ),
                             ],
-                            const SizedBox(height: 24),
-                            _buildActiveSection(),
-                            const SizedBox(height: 28),
-                            _buildLogSection(),
-                          ],
+                          ),
+                        )
+                      : RefreshIndicator(
+                          color: AppColors.primary,
+                          onRefresh: _load,
+                          child: ListView(
+                            padding:
+                                const EdgeInsets.fromLTRB(20, 24, 20, 32),
+                            children: [
+                              _buildRegisterForm(),
+                              if (_pendingVisitors.isNotEmpty) ...[
+                                const SizedBox(height: 28),
+                                _buildPendingSection(),
+                              ],
+                              const SizedBox(height: 28),
+                              _buildActiveSection(),
+                              const SizedBox(height: 32),
+                              _buildLogSection(),
+                            ],
+                          ),
                         ),
-                      ),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
       decoration: const BoxDecoration(
-        color: AppColors.cardBackground,
-        border: Border(bottom: BorderSide(color: AppColors.divider)),
+        color: AppColors.surfaceWarm,
+        border: Border(bottom: BorderSide(color: AppColors.borderSubtle)),
       ),
       child: Row(
         children: [
           SvgPicture.asset(
             'assets/icons/visitor_active_list.svg',
-            width: 22,
-            height: 12,
+            width: 24,
+            height: 14,
             colorFilter:
                 const ColorFilter.mode(AppColors.primary, BlendMode.srcIn),
           ),
@@ -263,11 +269,10 @@ class _UserVisitorsScreenState extends State<UserVisitorsScreen> {
           Text(
             'Visitantes',
             style: GoogleFonts.publicSans(
-              fontSize: 20,
+              fontSize: 22,
               fontWeight: FontWeight.w700,
-              height: 28 / 20,
-              letterSpacing: -0.5,
-              color: AppColors.textDark,
+              letterSpacing: -0.4,
+              color: AppColors.textDarkWarm,
             ),
           ),
         ],
@@ -277,33 +282,31 @@ class _UserVisitorsScreenState extends State<UserVisitorsScreen> {
 
   Widget _buildRegisterForm() {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderLight),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0D000000),
-            blurRadius: 2,
-            offset: Offset(0, 1),
-          ),
-        ],
-      ),
+      padding: const EdgeInsets.all(18),
+      decoration: AppDecorations.premiumCard(radius: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.person_add_alt_1_rounded,
-                  size: 20, color: AppColors.primary),
-              const SizedBox(width: 8),
+              Container(
+                width: 36,
+                height: 36,
+                decoration: AppDecorations.iconTile(tint: AppColors.primary),
+                child: const Icon(
+                  Icons.person_add_alt_1_rounded,
+                  size: 18,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
               Text(
                 'Registrar Visitante',
                 style: GoogleFonts.publicSans(
-                  fontSize: 16,
+                  fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textDark,
+                  letterSpacing: -0.3,
+                  color: AppColors.textDarkWarm,
                 ),
               ),
             ],
@@ -362,29 +365,29 @@ class _UserVisitorsScreenState extends State<UserVisitorsScreen> {
 
   Widget _formField(TextEditingController controller, String hint) {
     return Container(
-      height: 44,
+      height: 46,
       decoration: BoxDecoration(
-        color: AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.borderLight),
+        color: AppColors.surfaceWarmElevated,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderSubtle),
       ),
       child: TextField(
         controller: controller,
         style: GoogleFonts.publicSans(
           fontSize: 14,
           fontWeight: FontWeight.w400,
-          color: AppColors.textDark,
+          color: AppColors.textDarkWarm,
         ),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: GoogleFonts.publicSans(
             fontSize: 14,
             fontWeight: FontWeight.w400,
-            color: AppColors.textSecondary,
+            color: AppColors.textMutedWarm,
           ),
           border: InputBorder.none,
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           isDense: true,
         ),
       ),
@@ -395,72 +398,32 @@ class _UserVisitorsScreenState extends State<UserVisitorsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: const BoxDecoration(
-                color: Color(0xFFF59E0B),
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Pendientes de entrada',
-              style: GoogleFonts.publicSans(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textDark,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '${_pendingVisitors.length}',
-                style: GoogleFonts.publicSans(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFFF59E0B),
-                ),
-              ),
-            ),
-          ],
+        _buildSectionHeader(
+          'Pendientes de entrada',
+          count: _pendingVisitors.length,
+          accent: AppColors.warning,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         ...List.generate(_pendingVisitors.length, (i) {
           final v = _pendingVisitors[i];
           return Container(
             margin: EdgeInsets.only(
-                bottom: i < _pendingVisitors.length - 1 ? 8 : 0),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.cardBackground,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
-            ),
+                bottom: i < _pendingVisitors.length - 1 ? 10 : 0),
+            padding: const EdgeInsets.all(16),
+            decoration: AppDecorations.premiumCard(radius: 16),
             child: Row(
               children: [
                 Container(
                   width: 40,
                   height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                  decoration: AppDecorations.iconTile(tint: AppColors.warning),
                   child: const Icon(
                     Icons.schedule_rounded,
                     size: 20,
-                    color: Color(0xFFF59E0B),
+                    color: AppColors.warning,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -470,16 +433,16 @@ class _UserVisitorsScreenState extends State<UserVisitorsScreen> {
                         style: GoogleFonts.publicSans(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textDark,
+                          color: AppColors.textDarkWarm,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         'Esperando confirmación en portería',
                         style: GoogleFonts.publicSans(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w400,
-                          color: const Color(0xFFF59E0B),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.warning,
                         ),
                       ),
                     ],
@@ -493,68 +456,68 @@ class _UserVisitorsScreenState extends State<UserVisitorsScreen> {
     );
   }
 
+  Widget _buildSectionHeader(String title,
+      {required int count, required Color accent}) {
+    return Row(
+      children: [
+        Text(
+          title,
+          style: GoogleFonts.publicSans(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.3,
+            color: AppColors.textDarkWarm,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            '$count',
+            style: GoogleFonts.publicSans(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: accent,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildActiveSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: const BoxDecoration(
-                color: Color(0xFF22C55E),
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Visitantes Activos',
-              style: GoogleFonts.publicSans(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textDark,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '${_activeVisitors.length}',
-                style: GoogleFonts.publicSans(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
-                ),
-              ),
-            ),
-          ],
+        _buildSectionHeader(
+          'Visitantes Activos',
+          count: _activeVisitors.length,
+          accent: AppColors.success,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         if (_activeVisitors.isEmpty)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: AppColors.cardBackground,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.borderLight),
-            ),
+            padding: const EdgeInsets.all(28),
+            decoration: AppDecorations.premiumCard(radius: 16),
             child: Column(
               children: [
-                Icon(Icons.people_outline_rounded,
-                    size: 36, color: AppColors.textSecondary.withValues(alpha: 0.5)),
-                const SizedBox(height: 8),
+                Icon(
+                  Icons.people_outline_rounded,
+                  size: 36,
+                  color: AppColors.textMutedWarm.withValues(alpha: 0.5),
+                ),
+                const SizedBox(height: 10),
                 Text(
                   'No hay visitantes activos',
                   style: GoogleFonts.publicSans(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary,
+                    color: AppColors.textMutedWarm,
                   ),
                 ),
               ],
@@ -564,36 +527,24 @@ class _UserVisitorsScreenState extends State<UserVisitorsScreen> {
           ...List.generate(_activeVisitors.length, (i) {
             final v = _activeVisitors[i];
             return Container(
-              margin: EdgeInsets.only(bottom: i < _activeVisitors.length - 1 ? 8 : 0),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.cardBackground,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.borderLight),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x0D000000),
-                    blurRadius: 2,
-                    offset: Offset(0, 1),
-                  ),
-                ],
-              ),
+              margin: EdgeInsets.only(
+                  bottom: i < _activeVisitors.length - 1 ? 10 : 0),
+              padding: const EdgeInsets.all(16),
+              decoration: AppDecorations.premiumCard(radius: 16),
               child: Row(
                 children: [
                   Container(
                     width: 40,
                     height: 40,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                    decoration:
+                        AppDecorations.iconTile(tint: AppColors.success),
                     child: const Icon(
                       Icons.person_rounded,
                       size: 20,
-                      color: AppColors.primary,
+                      color: AppColors.success,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -603,7 +554,7 @@ class _UserVisitorsScreenState extends State<UserVisitorsScreen> {
                           style: GoogleFonts.publicSans(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.textDark,
+                            color: AppColors.textDarkWarm,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -613,8 +564,8 @@ class _UserVisitorsScreenState extends State<UserVisitorsScreen> {
                               : '--',
                           style: GoogleFonts.publicSans(
                             fontSize: 12,
-                            fontWeight: FontWeight.w400,
-                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textMutedWarm,
                           ),
                         ),
                       ],
@@ -628,7 +579,7 @@ class _UserVisitorsScreenState extends State<UserVisitorsScreen> {
                         style: GoogleFonts.publicSans(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textDark,
+                          color: AppColors.textDarkWarm,
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -636,20 +587,18 @@ class _UserVisitorsScreenState extends State<UserVisitorsScreen> {
                         onTap: () => _confirmExit(v['id']?.toString() ?? ''),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
+                              horizontal: 12, vertical: 5),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEF4444).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: const Color(0xFFEF4444).withValues(alpha: 0.3),
-                            ),
+                            color: AppColors.error.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
                             'Marcar salida',
                             style: GoogleFonts.publicSans(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
-                              color: const Color(0xFFEF4444),
+                              letterSpacing: 0.3,
+                              color: AppColors.error,
                             ),
                           ),
                         ),
@@ -672,56 +621,42 @@ class _UserVisitorsScreenState extends State<UserVisitorsScreen> {
           children: [
             SvgPicture.asset(
               'assets/icons/visitor_history.svg',
-              width: 16,
-              height: 16,
-              colorFilter:
-                  const ColorFilter.mode(AppColors.textSecondary, BlendMode.srcIn),
+              width: 18,
+              height: 18,
+              colorFilter: const ColorFilter.mode(
+                  AppColors.textMutedWarm, BlendMode.srcIn),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Text(
               'Historial Reciente',
               style: GoogleFonts.publicSans(
-                fontSize: 16,
+                fontSize: 20,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textDark,
+                letterSpacing: -0.3,
+                color: AppColors.textDarkWarm,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         if (_recentLog.isEmpty)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: AppColors.cardBackground,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.borderLight),
-            ),
+            padding: const EdgeInsets.all(28),
+            decoration: AppDecorations.premiumCard(radius: 16),
             child: Text(
               'Sin registros recientes',
               textAlign: TextAlign.center,
               style: GoogleFonts.publicSans(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: AppColors.textSecondary,
+                color: AppColors.textMutedWarm,
               ),
             ),
           )
         else
           Container(
-            decoration: BoxDecoration(
-              color: AppColors.cardBackground,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.borderLight),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x0D000000),
-                  blurRadius: 2,
-                  offset: Offset(0, 1),
-                ),
-              ],
-            ),
+            decoration: AppDecorations.premiumCard(radius: 16),
             child: Column(
               children: List.generate(_recentLog.length, (i) {
                 final v = _recentLog[i];
@@ -730,28 +665,26 @@ class _UserVisitorsScreenState extends State<UserVisitorsScreen> {
                     if (i > 0)
                       const Divider(
                           height: 1,
-                          indent: 14,
-                          endIndent: 14,
-                          color: AppColors.borderLight),
+                          indent: 16,
+                          endIndent: 16,
+                          color: AppColors.borderSubtle),
                     Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 12),
+                          horizontal: 16, vertical: 14),
                       child: Row(
                         children: [
                           Container(
                             width: 36,
                             height: 36,
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceLight,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
+                            decoration: AppDecorations.iconTile(
+                                tint: AppColors.textMutedWarm),
+                            child: const Icon(
                               Icons.person_outline_rounded,
                               size: 18,
-                              color: AppColors.textSecondary.withValues(alpha: 0.7),
+                              color: AppColors.textMutedWarm,
                             ),
                           ),
-                          const SizedBox(width: 10),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -761,7 +694,7 @@ class _UserVisitorsScreenState extends State<UserVisitorsScreen> {
                                   style: GoogleFonts.publicSans(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
-                                    color: AppColors.textDark,
+                                    color: AppColors.textDarkWarm,
                                   ),
                                 ),
                                 Text(
@@ -770,8 +703,8 @@ class _UserVisitorsScreenState extends State<UserVisitorsScreen> {
                                       : '--',
                                   style: GoogleFonts.publicSans(
                                     fontSize: 11,
-                                    fontWeight: FontWeight.w400,
-                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.textMutedWarm,
                                   ),
                                 ),
                               ],
@@ -784,16 +717,16 @@ class _UserVisitorsScreenState extends State<UserVisitorsScreen> {
                                 _formatTime(v['entry_time']?.toString()),
                                 style: GoogleFonts.publicSans(
                                   fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.textDark,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textDarkWarm,
                                 ),
                               ),
                               Text(
                                 '→ ${_formatTime(v['exit_time']?.toString())}',
                                 style: GoogleFonts.publicSans(
                                   fontSize: 11,
-                                  fontWeight: FontWeight.w400,
-                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textMutedWarm,
                                 ),
                               ),
                             ],

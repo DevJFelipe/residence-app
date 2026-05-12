@@ -135,7 +135,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 16),
               Text(
                 'Registro exitoso',
-                style: GoogleFonts.dmSans(
+                style: GoogleFonts.publicSans(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
                   color: _darkText,
@@ -147,7 +147,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ? message
                     : 'Tu cuenta ha sido creada. '
                         'Ya puedes iniciar sesión.',
-                style: GoogleFonts.dmSans(
+                style: GoogleFonts.publicSans(
                   fontSize: 14,
                   fontWeight: FontWeight.w400,
                   height: 22 / 14,
@@ -171,7 +171,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: Center(
                     child: Text(
                       'Ir a iniciar sesión',
-                      style: GoogleFonts.dmSans(
+                      style: GoogleFonts.publicSans(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
@@ -206,7 +206,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     // Title
                     Text(
                       'Crear cuenta',
-                      style: GoogleFonts.dmSans(
+                      style: GoogleFonts.publicSans(
                         fontSize: 24,
                         fontWeight: FontWeight.w700,
                         height: 32 / 24,
@@ -216,7 +216,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const SizedBox(height: 8),
                     Text(
                       'Completa tus datos para registrarte',
-                      style: GoogleFonts.dmSans(
+                      style: GoogleFonts.publicSans(
                         fontSize: 16,
                         fontWeight: FontWeight.w400,
                         color: _darkText.withValues(alpha: 0.6),
@@ -247,7 +247,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             Expanded(
                               child: Text(
                                 _generalError!,
-                                style: GoogleFonts.dmSans(
+                                style: GoogleFonts.publicSans(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
                                   color: const Color(0xFFEF4444),
@@ -403,7 +403,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 )
                               : Text(
                                   'Crear cuenta',
-                                  style: GoogleFonts.dmSans(
+                                  style: GoogleFonts.publicSans(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w700,
                                     height: 28 / 18,
@@ -422,7 +422,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       children: [
                         Text(
                           '¿Ya tienes cuenta? ',
-                          style: GoogleFonts.dmSans(
+                          style: GoogleFonts.publicSans(
                             fontSize: 14,
                             fontWeight: FontWeight.w400,
                             color: _darkText.withValues(
@@ -435,7 +435,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               Navigator.of(context).pop(),
                           child: Text(
                             'Inicia sesión',
-                            style: GoogleFonts.dmSans(
+                            style: GoogleFonts.publicSans(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                               color: _primary,
@@ -509,7 +509,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         child: Text(
           text,
-          style: GoogleFonts.dmSans(
+          style: GoogleFonts.publicSans(
             fontSize: 12,
             fontWeight: FontWeight.w700,
             height: 16 / 12,
@@ -563,7 +563,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               textCapitalization: textCapitalization,
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle: GoogleFonts.dmSans(
+                hintStyle: GoogleFonts.publicSans(
                   fontSize: 16,
                   fontWeight: FontWeight.w400,
                   color: const Color(0xFF6B7280),
@@ -574,7 +574,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     : EdgeInsets.zero,
                 isDense: true,
               ),
-              style: GoogleFonts.dmSans(
+              style: GoogleFonts.publicSans(
                 fontSize: 16,
                 fontWeight: FontWeight.w400,
                 color: _darkText,
@@ -599,7 +599,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         alignment: Alignment.centerLeft,
         child: Text(
           text,
-          style: GoogleFonts.dmSans(
+          style: GoogleFonts.publicSans(
             fontSize: 12,
             fontWeight: FontWeight.w500,
             color: const Color(0xFFEF4444),

@@ -29,6 +29,17 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
   void initState() {
     super.initState();
     _loadBookings();
+    AmenitiesService.bookingsChanged.addListener(_onBookingsChanged);
+  }
+
+  @override
+  void dispose() {
+    AmenitiesService.bookingsChanged.removeListener(_onBookingsChanged);
+    super.dispose();
+  }
+
+  void _onBookingsChanged() {
+    if (mounted) _loadBookings();
   }
 
   Future<void> _loadBookings() async {
@@ -63,17 +74,19 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
   }
 
   String _formatDate(DateTime dt) {
+    final local = dt.toLocal();
     const months = [
       'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
       'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
     ];
-    return '${dt.day} ${months[dt.month - 1]}, ${dt.year}';
+    return '${local.day} ${months[local.month - 1]}, ${local.year}';
   }
 
   String _formatTime(DateTime start, DateTime end) {
     String fmt(DateTime dt) {
-      final h = dt.hour.toString().padLeft(2, '0');
-      final m = dt.minute.toString().padLeft(2, '0');
+      final local = dt.toLocal();
+      final h = local.hour.toString().padLeft(2, '0');
+      final m = local.minute.toString().padLeft(2, '0');
       return '$h:$m';
     }
     return '${fmt(start)} - ${fmt(end)}';
@@ -106,7 +119,7 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
                                 const SizedBox(height: 16),
                                 Text(_error!,
                                     textAlign: TextAlign.center,
-                                    style: GoogleFonts.dmSans(
+                                    style: GoogleFonts.publicSans(
                                         color: const Color(0xFF64748B))),
                                 const SizedBox(height: 16),
                                 TextButton(
@@ -128,7 +141,7 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
                                       _activeTab == 0
                                           ? 'No tienes reservas próximas'
                                           : 'No tienes historial de reservas',
-                                      style: GoogleFonts.dmSans(
+                                      style: GoogleFonts.publicSans(
                                           color: const Color(0xFF64748B)),
                                     ),
                                   ),
@@ -177,7 +190,7 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
                   child: Center(
                     child: Text(
                       'Mis Reservas',
-                      style: GoogleFonts.cormorantGaramond(
+                      style: GoogleFonts.publicSans(
                         fontSize: 24,
                         fontWeight: FontWeight.w700,
                         height: 32 / 24,
@@ -221,7 +234,7 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
           child: Center(
             child: Text(
               label,
-              style: GoogleFonts.dmSans(
+              style: GoogleFonts.publicSans(
                 fontSize: 14,
                 fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                 height: 20 / 14,
@@ -294,7 +307,7 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
               ),
               child: Text(
                 badgeLabel,
-                style: GoogleFonts.dmSans(
+                style: GoogleFonts.publicSans(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                   height: 15 / 10,
@@ -306,7 +319,7 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
             // Title
             Text(
               booking.amenityName ?? 'Reserva',
-              style: GoogleFonts.cormorantGaramond(
+              style: GoogleFonts.publicSans(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 height: 25 / 20,
@@ -322,7 +335,7 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
                 const SizedBox(width: 4),
                 Text(
                   _formatDate(booking.startTime),
-                  style: GoogleFonts.dmSans(
+                  style: GoogleFonts.publicSans(
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
                     height: 20 / 14,
@@ -339,7 +352,7 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
                 const SizedBox(width: 4),
                 Text(
                   _formatTime(booking.startTime, booking.endTime),
-                  style: GoogleFonts.dmSans(
+                  style: GoogleFonts.publicSans(
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
                     height: 20 / 14,
@@ -348,17 +361,6 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
                 ),
               ],
             ),
-            if (booking.totalCost > 0) ...[
-              const SizedBox(height: 4),
-              Text(
-                'Costo: \$${booking.totalCost.toStringAsFixed(0)}',
-                style: GoogleFonts.dmSans(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: _accent,
-                ),
-              ),
-            ],
             const SizedBox(height: 12),
             // Detail button
             GestureDetector(
@@ -375,7 +377,7 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
                 ),
                 child: Text(
                   'VER DETALLES',
-                  style: GoogleFonts.dmSans(
+                  style: GoogleFonts.publicSans(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                     height: 16 / 12,
@@ -420,7 +422,7 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
                 const SizedBox(height: 16),
                 Text(
                   booking.amenityName ?? 'Reserva',
-                  style: GoogleFonts.cormorantGaramond(
+                  style: GoogleFonts.publicSans(
                     fontSize: 24,
                     fontWeight: FontWeight.w700,
                     height: 32 / 24,
@@ -436,11 +438,6 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
                 const SizedBox(height: 8),
                 _detailRow(Icons.info_outline,
                     'Estado: ${booking.bookingStatusName?.toUpperCase() ?? "N/A"}'),
-                if (booking.totalCost > 0) ...[
-                  const SizedBox(height: 8),
-                  _detailRow(Icons.attach_money,
-                      'Costo: \$${booking.totalCost.toStringAsFixed(0)}'),
-                ],
                 if (booking.notes != null && booking.notes!.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   _detailRow(Icons.note_outlined, 'Notas: ${booking.notes}'),
@@ -458,7 +455,7 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
                             borderRadius: BorderRadius.circular(8)),
                       ),
                       child: Text('Cancelar reserva',
-                          style: GoogleFonts.dmSans(
+                          style: GoogleFonts.publicSans(
                               fontWeight: FontWeight.w600)),
                     ),
                   ),
@@ -552,7 +549,7 @@ class _MyReservationsScreenState extends State<MyReservationsScreen> {
         const SizedBox(width: 8),
         Expanded(
           child: Text(text,
-              style: GoogleFonts.dmSans(
+              style: GoogleFonts.publicSans(
                   fontSize: 14, color: const Color(0xFF64748B))),
         ),
       ],

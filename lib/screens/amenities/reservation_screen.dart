@@ -25,13 +25,16 @@ class _ReservationScreenState extends State<ReservationScreen> {
 
   final _service = AmenitiesService();
 
+  static const int _maxHours = 3;
+
   DateTime _selectedDate = DateTime.now();
   late DateTime _currentMonth;
-  int _selectedTimeSlot = -1;
+  final Set<int> _selectedSlots = <int>{};
   int _guestCount = 1;
   bool _termsAccepted = false;
   bool _isSubmitting = false;
   String? _error;
+  int _selectedTurn = 0; // 0: Mañana, 1: Tarde, 2: Noche
 
   // User's property for booking
   UserProperty? _userProperty;
@@ -108,9 +111,10 @@ class _ReservationScreenState extends State<ReservationScreen> {
       if (!mounted) return;
       // Filter bookings for the selected date that are active (pendiente=1, aprobada=2)
       final dateBookings = bookings.where((b) {
-        final sameDay = b.startTime.year == _selectedDate.year &&
-            b.startTime.month == _selectedDate.month &&
-            b.startTime.day == _selectedDate.day;
+        final local = b.startTime.toLocal();
+        final sameDay = local.year == _selectedDate.year &&
+            local.month == _selectedDate.month &&
+            local.day == _selectedDate.day;
         return sameDay && (b.bookingStatusId == 1 || b.bookingStatusId == 2);
       }).toList();
       setState(() {
@@ -169,7 +173,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
   }
 
   Future<void> _submitBooking() async {
-    if (_selectedTimeSlot < 0) {
+    if (_selectedSlots.isEmpty) {
       setState(() => _error = 'Selecciona un horario');
       return;
     }
@@ -182,9 +186,11 @@ class _ReservationScreenState extends State<ReservationScreen> {
       return;
     }
 
-    final slot = _timeSlots[_selectedTimeSlot];
-    final startHour = int.parse(slot['start']!);
-    final endHour = int.parse(slot['end']!);
+    final sortedIndices = _selectedSlots.toList()..sort();
+    final firstSlot = _timeSlots[sortedIndices.first];
+    final lastSlot = _timeSlots[sortedIndices.last];
+    final startHour = int.parse(firstSlot['start']!);
+    final endHour = int.parse(lastSlot['end']!);
     final startTime = DateTime(
       _selectedDate.year, _selectedDate.month, _selectedDate.day,
       startHour,
@@ -243,6 +249,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                       const SizedBox(height: 16),
                       _buildDatePicker(),
                       _buildTimeSlots2(),
+                      if (_selectedSlots.isNotEmpty) _buildSelectionSummary(),
                       _buildGuestCounter(),
                       if (_error != null) _buildError(),
                       _buildTermsSection(),
@@ -393,15 +400,6 @@ class _ReservationScreenState extends State<ReservationScreen> {
                   ),
                 ],
               ),
-            if (amenity.hourlyCost > 0) ...[
-              const SizedBox(height: 4),
-              Text(
-                '\$${amenity.hourlyCost.toStringAsFixed(0)}/hora',
-                style: GoogleFonts.publicSans(
-                  fontSize: 14, fontWeight: FontWeight.w600, color: _accent,
-                ),
-              ),
-            ],
           ],
         ),
       ),
@@ -519,7 +517,7 @@ class _ReservationScreenState extends State<ReservationScreen> {
                                           _currentMonth.month,
                                           day,
                                         );
-                                        _selectedTimeSlot = -1;
+                                        _selectedSlots.clear();
                                       });
                                       _loadBookingsForDate();
                                     },
@@ -580,108 +578,371 @@ class _ReservationScreenState extends State<ReservationScreen> {
     );
   }
 
+  int _turnOfSlot(Map<String, String> slot) {
+    final h = int.parse(slot['start']!);
+    if (h < 12) return 0;
+    if (h < 18) return 1;
+    return 2;
+  }
+
+  int get _maxSelectable {
+    final m = widget.amenity.maxHours;
+    return m < _maxHours ? m : _maxHours;
+  }
+
+  void _toggleSlot(int index) {
+    setState(() {
+      _error = null;
+      if (_selectedSlots.isEmpty) {
+        _selectedSlots.add(index);
+        return;
+      }
+      if (_selectedSlots.contains(index)) {
+        final sorted = _selectedSlots.toList()..sort();
+        // Allow removing only from edges to keep the range contiguous
+        if (index == sorted.first || index == sorted.last) {
+          _selectedSlots.remove(index);
+        }
+        return;
+      }
+      final sorted = _selectedSlots.toList()..sort();
+      final first = sorted.first;
+      final last = sorted.last;
+      final isAdjacent = index == first - 1 || index == last + 1;
+      final wouldExceed = _selectedSlots.length >= _maxSelectable;
+      if (!isAdjacent || wouldExceed) {
+        _selectedSlots
+          ..clear()
+          ..add(index);
+        return;
+      }
+      _selectedSlots.add(index);
+    });
+  }
+
   Widget _buildTimeSlots2() {
     final slots = _timeSlots;
+
+    // Auto-pick a turn that has slots, if current selection is empty
+    final turnCounts = [0, 0, 0];
+    for (final s in slots) {
+      turnCounts[_turnOfSlot(s)]++;
+    }
+    var effectiveTurn = _selectedTurn;
+    if (turnCounts[effectiveTurn] == 0) {
+      for (var i = 0; i < 3; i++) {
+        if (turnCounts[i] > 0) {
+          effectiveTurn = i;
+          break;
+        }
+      }
+    }
+
+    final visibleSlots = <MapEntry<int, Map<String, String>>>[];
+    for (var i = 0; i < slots.length; i++) {
+      if (_turnOfSlot(slots[i]) == effectiveTurn) {
+        visibleSlots.add(MapEntry(i, slots[i]));
+      }
+    }
+
+    const turnLabels = ['Mañana', 'Tarde', 'Noche'];
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Horarios disponibles',
-            style: GoogleFonts.publicSans(
-              fontSize: 18, fontWeight: FontWeight.w700, height: 28 / 18,
-              letterSpacing: -0.45, color: _dark,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Text(
+                  'Horarios disponibles',
+                  style: GoogleFonts.publicSans(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    height: 28 / 18,
+                    letterSpacing: -0.45,
+                    color: _dark,
+                  ),
+                ),
+              ),
+              Text(
+                'Toca para elegir · hasta $_maxSelectable h',
+                style: GoogleFonts.publicSans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: _bodyText,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          if (_loadingSlots)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: Center(child: SizedBox(
-                width: 20, height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )),
-            )
-          else
-            ...List.generate(slots.length, (index) {
-              final slot = slots[index];
-              final startH = int.parse(slot['start']!);
-              final endH = int.parse(slot['end']!);
-              final isOccupied = _isSlotOccupied(startH, endH);
-              final isSelected = _selectedTimeSlot == index;
-              return Padding(
-                padding: EdgeInsets.only(bottom: index < slots.length - 1 ? 12 : 0),
-                child: GestureDetector(
-                  onTap: isOccupied ? null : () => setState(() => _selectedTimeSlot = index),
-                  child: Opacity(
-                    opacity: isOccupied ? 0.5 : 1.0,
-                    child: Container(
-                      height: 76,
-                      padding: const EdgeInsets.symmetric(horizontal: 18),
+          const SizedBox(height: 14),
+          // Segmented control
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: const Color(0x14000000),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: List.generate(3, (i) {
+                final isActive = i == effectiveTurn;
+                final isEmpty = turnCounts[i] == 0;
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: isEmpty
+                        ? null
+                        : () => setState(() {
+                              _selectedTurn = i;
+                              _selectedSlots.clear();
+                            }),
+                    behavior: HitTestBehavior.opaque,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      padding: const EdgeInsets.symmetric(vertical: 9),
                       decoration: BoxDecoration(
-                        color: isOccupied
-                            ? const Color(0xFFF1F5F9)
-                            : isSelected
-                                ? _accent.withValues(alpha: 0.05)
-                                : Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isOccupied
-                              ? const Color(0xFFE2E8F0)
-                              : isSelected ? _accent : Colors.transparent,
-                          width: 2,
-                        ),
-                        boxShadow: isSelected || isOccupied
-                            ? null
-                            : const [
-                                BoxShadow(color: Color(0x0D000000), blurRadius: 2, offset: Offset(0, 1)),
-                              ],
+                        color: isActive ? Colors.white : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: isActive
+                            ? const [
+                                BoxShadow(
+                                  color: Color(0x14000000),
+                                  blurRadius: 6,
+                                  offset: Offset(0, 2),
+                                ),
+                              ]
+                            : null,
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                slot['time']!,
-                                style: GoogleFonts.publicSans(
-                                  fontSize: 16, fontWeight: FontWeight.w700, height: 24 / 16,
-                                  color: isOccupied ? const Color(0xFF94A3B8) : _dark,
-                                ),
-                              ),
-                              Text(
-                                isOccupied ? 'Ocupado' : slot['label']!,
-                                style: GoogleFonts.publicSans(
-                                  fontSize: 12, fontWeight: FontWeight.w500, height: 16 / 12,
-                                  color: isOccupied
-                                      ? const Color(0xFFEF4444)
-                                      : isSelected ? _accent : const Color(0xFF64748B),
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (isOccupied)
-                            const Icon(Icons.block_rounded, size: 20, color: Color(0xFFEF4444))
-                          else
-                            SvgPicture.asset(
-                              isSelected
-                                  ? 'assets/icons/reserv_check.svg'
-                                  : 'assets/icons/reserv_circle.svg',
-                              width: 20,
-                              height: 20,
-                            ),
-                        ],
+                      child: Text(
+                        turnLabels[i],
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.publicSans(
+                          fontSize: 13,
+                          fontWeight: isActive
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: isEmpty
+                              ? const Color(0xFFCBD5E1)
+                              : isActive
+                                  ? _dark
+                                  : _bodyText,
+                        ),
                       ),
                     ),
                   ),
+                );
+              }),
+            ),
+          ),
+          const SizedBox(height: 14),
+          if (_loadingSlots)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
-              );
-            }),
+              ),
+            )
+          else if (visibleSlots.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: Text(
+                  'No hay horarios en este turno',
+                  style: GoogleFonts.publicSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: _bodyText,
+                  ),
+                ),
+              ),
+            )
+          else
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate:
+                  const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 1.4,
+              ),
+              itemCount: visibleSlots.length,
+              itemBuilder: (_, i) {
+                final entry = visibleSlots[i];
+                final originalIndex = entry.key;
+                final slot = entry.value;
+                final startH = int.parse(slot['start']!);
+                final endH = int.parse(slot['end']!);
+                final isOccupied = _isSlotOccupied(startH, endH);
+                final isSelected = _selectedSlots.contains(originalIndex);
+                final start = _formatHour(startH);
+                final end = _formatHour(endH);
+                return GestureDetector(
+                  onTap: isOccupied ? null : () => _toggleSlot(originalIndex),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 140),
+                    decoration: BoxDecoration(
+                      color: isOccupied
+                          ? const Color(0xFFF1F5F9)
+                          : isSelected
+                              ? _accent
+                              : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isOccupied
+                            ? const Color(0xFFE2E8F0)
+                            : isSelected
+                                ? _accent
+                                : const Color(0x14000000),
+                        width: isSelected ? 1.5 : 1,
+                      ),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: _accent.withValues(alpha: 0.25),
+                                blurRadius: 12,
+                                offset: const Offset(0, 6),
+                                spreadRadius: -2,
+                              ),
+                            ]
+                          : isOccupied
+                              ? null
+                              : const [
+                                  BoxShadow(
+                                    color: Color(0x0A000000),
+                                    blurRadius: 2,
+                                    offset: Offset(0, 1),
+                                  ),
+                                ],
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          start,
+                          style: GoogleFonts.publicSans(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.3,
+                            color: isOccupied
+                                ? const Color(0xFF94A3B8)
+                                : isSelected
+                                    ? Colors.white
+                                    : _dark,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isOccupied ? 'Ocupado' : end,
+                          style: GoogleFonts.publicSans(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: isOccupied
+                                ? const Color(0xFFEF4444)
+                                : isSelected
+                                    ? Colors.white.withValues(alpha: 0.85)
+                                    : _bodyText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSelectionSummary() {
+    final sorted = _selectedSlots.toList()..sort();
+    final first = _timeSlots[sorted.first];
+    final last = _timeSlots[sorted.last];
+    final startHour = int.parse(first['start']!);
+    final endHour = int.parse(last['end']!);
+    final duration = _selectedSlots.length;
+    final atLimit = duration >= _maxSelectable;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: _accent.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _accent.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: _accent.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.schedule_rounded, size: 18, color: _accent),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$duration ${duration == 1 ? 'hora' : 'horas'} seleccionada${duration == 1 ? '' : 's'}',
+                    style: GoogleFonts.publicSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.2,
+                      color: _accent,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${_formatHour(startHour)} → ${_formatHour(endHour)}',
+                    style: GoogleFonts.publicSans(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.3,
+                      color: _dark,
+                    ),
+                  ),
+                  if (atLimit) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Máximo por reserva',
+                      style: GoogleFonts.publicSans(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: _bodyText,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            GestureDetector(
+              onTap: () => setState(() => _selectedSlots.clear()),
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Icon(
+                  Icons.close_rounded,
+                  size: 18,
+                  color: _bodyText,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -774,90 +1035,75 @@ class _ReservationScreenState extends State<ReservationScreen> {
   Widget _buildTermsSection() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: Column(
-        children: [
-          GestureDetector(
-            onTap: () => setState(() => _termsAccepted = !_termsAccepted),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: _termsAccepted ? _accent : Colors.white,
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color: _termsAccepted ? _accent : const Color(0xFFCBD5E1),
-                      ),
-                    ),
-                    child: _termsAccepted
-                        ? const Icon(Icons.check, size: 14, color: Colors.white)
-                        : null,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Acepto el reglamento de uso de áreas comunes y me hago responsable de cualquier daño.',
-                    style: GoogleFonts.publicSans(
-                      fontSize: 14, fontWeight: FontWeight.w400, height: 19.25 / 14, color: _bodyText,
-                    ),
-                  ),
-                ),
-              ],
+      child: GestureDetector(
+        onTap: () => setState(() => _termsAccepted = !_termsAccepted),
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: _termsAccepted
+                ? _accent.withValues(alpha: 0.08)
+                : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: _termsAccepted
+                  ? _accent.withValues(alpha: 0.35)
+                  : const Color(0x14000000),
+              width: _termsAccepted ? 1.5 : 1,
             ),
+            boxShadow: _termsAccepted
+                ? null
+                : const [
+                    BoxShadow(
+                      color: Color(0x0A000000),
+                      blurRadius: 2,
+                      offset: Offset(0, 1),
+                    ),
+                  ],
           ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
-            decoration: BoxDecoration(
-              color: _accent.withValues(alpha: 0.1),
-              borderRadius: const BorderRadius.only(
-                topRight: Radius.circular(8),
-                bottomRight: Radius.circular(8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: _termsAccepted ? _accent : Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _termsAccepted ? _accent : const Color(0xFFCBD5E1),
+                    width: 1.5,
+                  ),
+                ),
+                child: _termsAccepted
+                    ? const Icon(Icons.check_rounded,
+                        size: 18, color: Colors.white)
+                    : null,
               ),
-              border: Border(left: BorderSide(color: _accent, width: 4)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SvgPicture.asset('assets/icons/reserv_info.svg', width: 20, height: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Información de pago',
-                        style: GoogleFonts.publicSans(
-                          fontSize: 14, fontWeight: FontWeight.w600, height: 20 / 14, color: _dark,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        widget.amenity.hourlyCost > 0
-                            ? 'El costo de la reserva será cargado automáticamente a su próximo recibo de mantenimiento.'
-                            : 'Esta área no tiene costo de reserva.',
-                        style: GoogleFonts.publicSans(
-                          fontSize: 12, fontWeight: FontWeight.w400, height: 16 / 12, color: _bodyText,
-                        ),
-                      ),
-                    ],
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  'Acepto el reglamento de áreas comunes',
+                  style: GoogleFonts.publicSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    height: 1.3,
+                    color: _termsAccepted ? _dark : _dark,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildBottomButton(BuildContext context) {
-    final canSubmit = _termsAccepted && _selectedTimeSlot >= 0 && !_isSubmitting;
+    final canSubmit =
+        _termsAccepted && _selectedSlots.isNotEmpty && !_isSubmitting;
     return Positioned(
       bottom: 0,
       left: 0,

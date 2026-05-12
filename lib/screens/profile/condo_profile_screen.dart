@@ -121,23 +121,42 @@ class _CondoProfileScreenState extends State<CondoProfileScreen> {
 
   Widget _buildHero() {
     final image = condo['image'];
+    final logoUrl = condo['logo_url'] as String?;
     final name = condo['name'] as String? ?? '';
     final location = condo['location'] as String? ?? '';
+
+    final placeholder = Container(
+      color: const Color(0xFF1E293B),
+      child: Center(
+        child: Icon(
+          Icons.apartment_rounded,
+          size: 64,
+          color: Colors.white.withValues(alpha: 0.3),
+        ),
+      ),
+    );
+
+    Widget background;
+    if (logoUrl != null && logoUrl.isNotEmpty) {
+      background = Image.network(
+        logoUrl,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, progress) =>
+            progress == null ? child : placeholder,
+        errorBuilder: (_, __, ___) => placeholder,
+      );
+    } else if (image != null && image.toString().startsWith('assets/')) {
+      background = Image.asset(image as String, fit: BoxFit.cover);
+    } else {
+      background = placeholder;
+    }
 
     return AspectRatio(
       aspectRatio: 16 / 9,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (image != null && image.toString().startsWith('assets/'))
-            Image.asset(image as String, fit: BoxFit.cover)
-          else
-            Container(
-              color: const Color(0xFF1E293B),
-              child: Center(
-                child: Icon(Icons.apartment_rounded, size: 64, color: Colors.white.withValues(alpha: 0.3)),
-              ),
-            ),
+          background,
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(

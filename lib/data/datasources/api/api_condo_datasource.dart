@@ -9,7 +9,23 @@ class ApiCondoDatasource implements CondoRepository {
   Future<List<Map<String, dynamic>>> getFeatured() async {
     final response = await _dio.get('/api/v1/condominiums/featured');
     final items = List<Map<String, dynamic>>.from(response.data['data']);
-    return items.map(_mapCondo).toList();
+    final seen = <String>{};
+    final result = <Map<String, dynamic>>[];
+    for (final raw in items) {
+      final mapped = _mapCondo(raw);
+      // Dedupe by perceived identity: name + city + department.
+      // Backend sometimes returns multiple rows with distinct UUIDs
+      // for the same physical condo.
+      final key = [
+        (mapped['name'] ?? '').toString().toLowerCase().trim(),
+        (mapped['city'] ?? '').toString().toLowerCase().trim(),
+        (mapped['department'] ?? '').toString().toLowerCase().trim(),
+      ].join('|');
+      if (key == '||' || seen.add(key)) {
+        result.add(mapped);
+      }
+    }
+    return result;
   }
 
   @override

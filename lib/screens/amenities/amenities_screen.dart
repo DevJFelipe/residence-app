@@ -312,7 +312,7 @@ class _AmenitiesScreenState extends State<AmenitiesScreen> {
                 children: [
                   Text(
                     amenity.name,
-                    style: GoogleFonts.cormorantGaramond(
+                    style: GoogleFonts.publicSans(
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
                       height: 32 / 24,
@@ -356,19 +356,6 @@ class _AmenitiesScreenState extends State<AmenitiesScreen> {
                     ),
                   if (amenity.description == null)
                     const SizedBox(height: 16),
-                  // Pricing info
-                  if (amenity.hourlyCost > 0)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(
-                        '\$${amenity.hourlyCost.toStringAsFixed(0)}/hora',
-                        style: GoogleFonts.publicSans(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: _accent,
-                        ),
-                      ),
-                    ),
                   // Button
                   GestureDetector(
                     onTap: isAvailable

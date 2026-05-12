@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:residence_app/core/router/route_names.dart';
 import 'package:residence_app/providers/auth_provider.dart';
 import 'package:residence_app/services/auth_service.dart';
 import 'forgot_password_screen.dart';
@@ -66,14 +68,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
       if (!mounted) return;
 
-      // Update auth state — GoRouter's redirect will navigate automatically
+      final role = response.isAdmin ? 'admin' : 'user';
       ref.read(authStateProvider.notifier).setAuthenticated(
-        role: response.isAdmin ? 'admin' : 'user',
-        email: response.email,
-        name: response.fullName,
-      );
-      // No need for context.go — the router redirect handles navigation
-      // when authStateProvider changes (via refreshListenable).
+            role: role,
+            email: response.email,
+            name: response.fullName,
+          );
+
+      if (!mounted) return;
+      // Navigate explicitly — when /login was pushed on top of /welcome,
+      // the redirect alone isn't enough to replace the pushed route.
+      context.go(role == 'admin' ? '/admin' : '/user');
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -127,7 +132,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             top: topPadding + 12,
             left: 16,
             child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
+              onTap: _isLoading
+                  ? null
+                  : () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go(RouteNames.welcome);
+                      }
+                    },
               behavior: HitTestBehavior.opaque,
               child: Container(
                 width: 40,
@@ -153,7 +166,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
                     'Residence',
-                    style: GoogleFonts.cormorantGaramond(
+                    style: GoogleFonts.publicSans(
                       fontSize: 48,
                       fontWeight: FontWeight.w700,
                       height: 1,
@@ -165,7 +178,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 Text(
                   'Gestión exclusiva de tu comunidad',
-                  style: GoogleFonts.cormorantGaramond(
+                  style: GoogleFonts.publicSans(
                     fontSize: 20,
                     fontWeight: FontWeight.w400,
                     height: 28 / 20,
@@ -209,7 +222,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               // Title
               Text(
                 'Iniciar sesión',
-                style: GoogleFonts.dmSans(
+                style: GoogleFonts.publicSans(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
                   height: 32 / 24,
@@ -220,7 +233,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: 8),
               Text(
                 'Ingresa tus credenciales para continuar',
-                style: GoogleFonts.dmSans(
+                style: GoogleFonts.publicSans(
                   fontSize: 16,
                   fontWeight: FontWeight.w400,
                   height: 24 / 16,
@@ -253,7 +266,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Expanded(
                         child: Text(
                           _generalError!,
-                          style: GoogleFonts.dmSans(
+                          style: GoogleFonts.publicSans(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
                             color: const Color(0xFFEF4444),
@@ -325,7 +338,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   child: Text(
                     '¿Olvidaste tu contraseña?',
-                    style: GoogleFonts.dmSans(
+                    style: GoogleFonts.publicSans(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: _primary,
@@ -364,7 +377,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           )
                         : Text(
                             'Iniciar sesión',
-                            style: GoogleFonts.dmSans(
+                            style: GoogleFonts.publicSans(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
                               height: 28 / 18,
@@ -388,7 +401,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         padding: const EdgeInsets.only(left: 4, bottom: 8),
         child: Text(
           text,
-          style: GoogleFonts.dmSans(
+          style: GoogleFonts.publicSans(
             fontSize: 12,
             fontWeight: FontWeight.w700,
             height: 16 / 12,
@@ -439,7 +452,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               keyboardType: keyboardType,
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle: GoogleFonts.dmSans(
+                hintStyle: GoogleFonts.publicSans(
                   fontSize: 16,
                   fontWeight: FontWeight.w400,
                   color: const Color(0xFF6B7280),
@@ -450,7 +463,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     : EdgeInsets.zero,
                 isDense: true,
               ),
-              style: GoogleFonts.dmSans(
+              style: GoogleFonts.publicSans(
                 fontSize: 16,
                 fontWeight: FontWeight.w400,
                 color: _darkText,
@@ -475,7 +488,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         alignment: Alignment.centerLeft,
         child: Text(
           text,
-          style: GoogleFonts.dmSans(
+          style: GoogleFonts.publicSans(
             fontSize: 12,
             fontWeight: FontWeight.w500,
             color: const Color(0xFFEF4444),
@@ -493,7 +506,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         child: Center(
           child: Text(
             '© ${DateTime.now().year} Residence • Gestión Exclusiva',
-            style: GoogleFonts.dmSans(
+            style: GoogleFonts.publicSans(
               fontSize: 12,
               fontWeight: FontWeight.w400,
               height: 16 / 12,

@@ -199,7 +199,12 @@ class _CondoListCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildCondoImage(condo['image'], double.infinity, 180),
+            _buildCondoImage(
+              condo['image'],
+              condo['logo_url'] as String?,
+              double.infinity,
+              180,
+            ),
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -266,22 +271,42 @@ class _CondoListCard extends StatelessWidget {
     );
   }
 
-  Widget _buildCondoImage(dynamic imagePath, double width, double height) {
-    if (imagePath != null && imagePath.toString().startsWith('assets/')) {
-      return Image.asset(imagePath as String, width: width, height: height, fit: BoxFit.cover);
-    }
-    return Container(
+  Widget _buildCondoImage(
+      dynamic imagePath, String? logoUrl, double width, double height) {
+    final placeholder = Container(
       width: width,
       height: height,
       color: const Color(0xFFE2E8F0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.apartment_rounded, size: 40, color: AppColors.primary.withValues(alpha: 0.6)),
+          Icon(Icons.apartment_rounded,
+              size: 40, color: AppColors.primary.withValues(alpha: 0.6)),
           const SizedBox(height: 4),
-          Text('Residence', style: GoogleFonts.publicSans(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary.withValues(alpha: 0.6))),
+          Text('Residence',
+              style: GoogleFonts.publicSans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary.withValues(alpha: 0.6))),
         ],
       ),
     );
+
+    if (logoUrl != null && logoUrl.isNotEmpty) {
+      return Image.network(
+        logoUrl,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, progress) =>
+            progress == null ? child : placeholder,
+        errorBuilder: (_, __, ___) => placeholder,
+      );
+    }
+    if (imagePath != null && imagePath.toString().startsWith('assets/')) {
+      return Image.asset(imagePath as String,
+          width: width, height: height, fit: BoxFit.cover);
+    }
+    return placeholder;
   }
 }

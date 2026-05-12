@@ -2,9 +2,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../core/router/route_names.dart';
 import '../../theme/app_colors.dart';
-import '../login/login_screen.dart';
 import 'tabs/explorar_tab.dart';
 import 'tabs/perfil_tab.dart';
 
@@ -24,9 +25,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   ];
 
   void _goToLogin() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-    );
+    context.push(RouteNames.login);
   }
 
   @override

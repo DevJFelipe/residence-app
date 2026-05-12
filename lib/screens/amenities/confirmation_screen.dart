@@ -18,17 +18,19 @@ class ConfirmationScreen extends StatelessWidget {
   static const Color _bodyText = Color(0xFF475569);
 
   String _formatDate(DateTime dt) {
+    final local = dt.toLocal();
     const months = [
       'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
       'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
     ];
-    return '${dt.day} ${months[dt.month - 1]}, ${dt.year}';
+    return '${local.day} ${months[local.month - 1]}, ${local.year}';
   }
 
   String _formatTime(DateTime dt) {
-    final h = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
-    final period = dt.hour >= 12 ? 'PM' : 'AM';
-    return '${h.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} $period';
+    final local = dt.toLocal();
+    final h = local.hour > 12 ? local.hour - 12 : (local.hour == 0 ? 12 : local.hour);
+    final period = local.hour >= 12 ? 'PM' : 'AM';
+    return '${h.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')} $period';
   }
 
   @override
@@ -76,7 +78,6 @@ class ConfirmationScreen extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 17),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             GestureDetector(
               onTap: () => Navigator.of(context).maybePop(),
@@ -84,17 +85,30 @@ class ConfirmationScreen extends StatelessWidget {
                 width: 40,
                 height: 40,
                 child: Center(
-                  child: SvgPicture.asset('assets/icons/confirm_back.svg', width: 16, height: 16),
+                  child: SvgPicture.asset(
+                    'assets/icons/confirm_back.svg',
+                    width: 16,
+                    height: 16,
+                  ),
                 ),
               ),
             ),
-            Text(
-              'Confirmación de Reserva',
-              style: GoogleFonts.cormorantGaramond(
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-                height: 32 / 24,
-                color: AppColors.textDark,
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  'Confirmación de Reserva',
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.publicSans(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    height: 28 / 20,
+                    letterSpacing: -0.4,
+                    color: AppColors.textDark,
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: 40),
@@ -122,7 +136,7 @@ class ConfirmationScreen extends StatelessWidget {
         Text(
           title,
           textAlign: TextAlign.center,
-          style: GoogleFonts.cormorantGaramond(
+          style: GoogleFonts.publicSans(
             fontSize: 30,
             fontWeight: FontWeight.w700,
             height: 36 / 30,
@@ -133,7 +147,7 @@ class ConfirmationScreen extends StatelessWidget {
         Text(
           subtitle,
           textAlign: TextAlign.center,
-          style: GoogleFonts.dmSans(
+          style: GoogleFonts.publicSans(
             fontSize: 16,
             fontWeight: FontWeight.w400,
             height: 24 / 16,
@@ -167,7 +181,7 @@ class ConfirmationScreen extends StatelessWidget {
           children: [
             Text(
               amenityName,
-              style: GoogleFonts.cormorantGaramond(
+              style: GoogleFonts.publicSans(
                 fontSize: 24, fontWeight: FontWeight.w700, height: 32 / 24, color: _dark,
               ),
             ),
@@ -183,7 +197,7 @@ class ConfirmationScreen extends StatelessWidget {
                 ),
                 child: Text(
                   booking.bookingStatusName!,
-                  style: GoogleFonts.dmSans(
+                  style: GoogleFonts.publicSans(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: booking.isPendiente
@@ -220,13 +234,6 @@ class ConfirmationScreen extends StatelessWidget {
                     'REF.', refId,
                   ),
                 ),
-                if (booking.totalCost > 0)
-                  Expanded(
-                    child: _buildInfoItem(
-                      'assets/icons/confirm_people.svg', 22, 16,
-                      'COSTO', '\$${booking.totalCost.toStringAsFixed(0)}',
-                    ),
-                  ),
               ],
             ),
           ],
@@ -246,14 +253,14 @@ class ConfirmationScreen extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: GoogleFonts.dmSans(
+                style: GoogleFonts.publicSans(
                   fontSize: 10, fontWeight: FontWeight.w400, height: 15 / 10,
                   letterSpacing: 0.5, color: const Color(0xFF64748B),
                 ),
               ),
               Text(
                 value,
-                style: GoogleFonts.dmSans(
+                style: GoogleFonts.publicSans(
                   fontSize: 14, fontWeight: FontWeight.w700, height: 20 / 14, color: AppColors.textDark,
                 ),
               ),
@@ -284,7 +291,7 @@ class ConfirmationScreen extends StatelessWidget {
               child: Center(
                 child: Text(
                   'Volver al Inicio',
-                  style: GoogleFonts.dmSans(
+                  style: GoogleFonts.publicSans(
                     fontSize: 16, fontWeight: FontWeight.w700, height: 24 / 16, color: Colors.white,
                   ),
                 ),

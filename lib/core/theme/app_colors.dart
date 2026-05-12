@@ -40,4 +40,12 @@ class AppColors {
   static const Color badgeDomicilioText = Color(0xFF1D4ED8);
   static const Color badgeFamiliar = Color(0xFFF3E8FF);
   static const Color badgeFamiliarText = Color(0xFF7E22CE);
+
+  // Warm boutique palette (shared across user-facing screens)
+  static const Color surfaceWarm = Color(0xFFF7F4EF);
+  static const Color surfaceWarmElevated = Color(0xFFFDFBF7);
+  static const Color textDarkWarm = Color(0xFF0F1B2D);
+  static const Color textMutedWarm = Color(0xFF6B6357);
+  static const Color borderSubtle = Color(0x14000000);
+  static const Color shadowPremium = Color(0x0F000000);
 }

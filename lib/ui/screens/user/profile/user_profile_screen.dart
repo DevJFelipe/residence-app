@@ -1,22 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:residence_app/core/api_client.dart';
+import 'package:residence_app/core/router/route_names.dart';
 import 'package:residence_app/core/session_manager.dart';
 import 'package:residence_app/core/theme/app_colors.dart';
+import 'package:residence_app/core/theme/app_decorations.dart';
 import 'package:residence_app/core/theme/app_text_styles.dart';
 import 'package:residence_app/models/auth_models.dart';
-import 'package:residence_app/screens/login/login_screen.dart';
+import 'package:residence_app/providers/auth_provider.dart';
 import 'package:residence_app/screens/profile/change_password_screen.dart';
 import 'package:residence_app/ui/screens/user/pqrs/user_pqrs_screen.dart';
 
-class UserProfileScreen extends StatefulWidget {
+class UserProfileScreen extends ConsumerStatefulWidget {
   const UserProfileScreen({super.key});
 
   @override
-  State<UserProfileScreen> createState() => _UserProfileScreenState();
+  ConsumerState<UserProfileScreen> createState() => _UserProfileScreenState();
 }
 
-class _UserProfileScreenState extends State<UserProfileScreen> {
+class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   String _name = '';
   String _email = '';
   String _initials = '?';
@@ -84,12 +88,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   Future<void> _logout() async {
-    await SessionManager().clear();
+    // Clears session + resets authStateProvider so GoRouter stops routing
+    // the user into /user shells.
+    await ref.read(authStateProvider.notifier).logout();
     if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (route) => false,
-    );
+    // Go to the welcome landing (Explorar tab is the default)
+    context.go(RouteNames.welcome);
   }
 
   @override
@@ -100,49 +104,51 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       );
     }
 
-    return SafeArea(
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
-          child: Column(
-            children: [
-              _buildProfileHeader(),
-              const SizedBox(height: 24),
-              const Divider(height: 1, color: AppColors.divider),
-              const SizedBox(height: 24),
-              if (_property != null) ...[
-                _buildUnitInfoCard(),
+    return Container(
+      color: AppColors.surfaceWarm,
+      child: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 32, 20, 40),
+            child: Column(
+              children: [
+                _buildProfileHeader(),
+                const SizedBox(height: 28),
+                if (_property != null) ...[
+                  _buildUnitInfoCard(),
+                  const SizedBox(height: 24),
+                ],
+                _buildPersonalInfoCard(),
                 const SizedBox(height: 24),
-              ],
-              _buildPersonalInfoCard(),
-              const SizedBox(height: 24),
-              _buildMenuSection(context, 'Gestiones', [
-                _MenuItem(Icons.assignment_rounded, 'Mis PQRS',
-                    onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const UserPqrsScreen()))),
-              ]),
-              const SizedBox(height: 24),
-              _buildMenuSection(context, 'Mi Cuenta', [
-                _MenuItem(Icons.lock_outline_rounded, 'Cambiar contraseña',
-                    onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const ChangePasswordScreen()))),
-              ]),
-              const SizedBox(height: 24),
-              Text(
-                'Residence v1.0.0',
-                style: GoogleFonts.publicSans(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w400,
-                  color: AppColors.textSecondary,
+                _buildMenuSection(context, 'Gestiones', [
+                  _MenuItem(Icons.assignment_rounded, 'Mis PQRS',
+                      onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const UserPqrsScreen()))),
+                ]),
+                const SizedBox(height: 24),
+                _buildMenuSection(context, 'Mi Cuenta', [
+                  _MenuItem(Icons.lock_outline_rounded, 'Cambiar contraseña',
+                      onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) =>
+                                  const ChangePasswordScreen()))),
+                ]),
+                const SizedBox(height: 28),
+                Text(
+                  'Residence v1.0.0',
+                  style: GoogleFonts.publicSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    color: AppColors.textMutedWarm,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              _buildLogoutButton(),
-            ],
+                const SizedBox(height: 20),
+                _buildLogoutButton(),
+              ],
+            ),
           ),
         ),
       ),
@@ -170,13 +176,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         Text(
           _name,
           style: GoogleFonts.publicSans(
-            fontSize: 22,
+            fontSize: 24,
             fontWeight: FontWeight.w700,
-            color: AppColors.textDark,
+            letterSpacing: -0.4,
+            color: AppColors.textDarkWarm,
           ),
         ),
         const SizedBox(height: 4),
@@ -185,7 +192,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           style: GoogleFonts.publicSans(
             fontSize: 14,
             fontWeight: FontWeight.w400,
-            color: AppColors.textSecondary,
+            color: AppColors.textMutedWarm,
           ),
         ),
         if (_property != null) ...[
@@ -215,35 +222,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Mi Unidad',
-          style: GoogleFonts.publicSans(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.5,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 8),
+        _buildSectionLabel('Mi Unidad'),
+        const SizedBox(height: 12),
         Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.cardBackground,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.borderLight),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x0D000000),
-                blurRadius: 2,
-                offset: Offset(0, 1),
-              ),
-            ],
-          ),
+          padding: const EdgeInsets.all(18),
+          decoration: AppDecorations.premiumCard(radius: 16),
           child: Column(
             children: [
               if (prop.block != null && prop.block!.isNotEmpty) ...[
                 _infoRow('Bloque/Torre', prop.block!),
-                const Divider(height: 20, color: AppColors.borderLight),
+                const Divider(height: 20, color: AppColors.borderSubtle),
               ],
               _infoRow('Unidad', prop.propertyNumber),
             ],
@@ -257,49 +245,42 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Información Personal',
-          style: GoogleFonts.publicSans(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.5,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 8),
+        _buildSectionLabel('Información Personal'),
+        const SizedBox(height: 12),
         Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.cardBackground,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.borderLight),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x0D000000),
-                blurRadius: 2,
-                offset: Offset(0, 1),
-              ),
-            ],
-          ),
+          padding: const EdgeInsets.all(18),
+          decoration: AppDecorations.premiumCard(radius: 16),
           child: Column(
             children: [
               _infoRow('Nombre', _name),
-              const Divider(height: 20, color: AppColors.borderLight),
+              const Divider(height: 20, color: AppColors.borderSubtle),
               _infoRow('Email', _email),
               if (_phone != null && _phone!.isNotEmpty) ...[
-                const Divider(height: 20, color: AppColors.borderLight),
+                const Divider(height: 20, color: AppColors.borderSubtle),
                 _infoRow('Teléfono', _phone!),
               ],
               if (_document != null && _document!.isNotEmpty) ...[
-                const Divider(height: 20, color: AppColors.borderLight),
+                const Divider(height: 20, color: AppColors.borderSubtle),
                 _infoRow('Documento', _document!),
               ],
-              const Divider(height: 20, color: AppColors.borderLight),
+              const Divider(height: 20, color: AppColors.borderSubtle),
               _infoRow('Rol', _roleName),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSectionLabel(String text) {
+    return Text(
+      text,
+      style: GoogleFonts.publicSans(
+        fontSize: 20,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.3,
+        color: AppColors.textDarkWarm,
+      ),
     );
   }
 
@@ -324,29 +305,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: GoogleFonts.publicSans(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.5,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 8),
+        _buildSectionLabel(title),
+        const SizedBox(height: 12),
         Container(
-          decoration: BoxDecoration(
-            color: AppColors.cardBackground,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.borderLight),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x0D000000),
-                blurRadius: 2,
-                offset: Offset(0, 1),
-              ),
-            ],
-          ),
+          decoration: AppDecorations.premiumCard(radius: 16),
           child: Column(
             children: List.generate(items.length, (index) {
               final item = items[index];
@@ -355,28 +317,43 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   if (index > 0)
                     const Divider(
                       height: 1,
-                      indent: 52,
-                      color: AppColors.borderLight,
+                      indent: 56,
+                      color: AppColors.borderSubtle,
                     ),
                   GestureDetector(
                     onTap: item.onTap,
                     behavior: HitTestBehavior.opaque,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
+                          horizontal: 18, vertical: 16),
                       child: Row(
                         children: [
-                          Icon(item.icon,
-                              size: 20, color: AppColors.textSecondary),
-                          const SizedBox(width: 16),
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: AppDecorations.iconTile(
+                                tint: AppColors.primary),
+                            child: Icon(
+                              item.icon,
+                              size: 18,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
                           Expanded(
-                            child:
-                                Text(item.title, style: AppTextStyles.medium14),
+                            child: Text(
+                              item.title,
+                              style: GoogleFonts.publicSans(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textDarkWarm,
+                              ),
+                            ),
                           ),
                           const Icon(
                             Icons.chevron_right_rounded,
                             size: 20,
-                            color: AppColors.textSecondary,
+                            color: AppColors.textMutedWarm,
                           ),
                         ],
                       ),

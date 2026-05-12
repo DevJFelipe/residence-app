@@ -239,7 +239,12 @@ class ExplorarTab extends ConsumerWidget {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(12),
-                            child: _buildCondoImage(condo['image'], 256, 160),
+                            child: _buildCondoImage(
+                              condo['image'],
+                              condo['logo_url'] as String?,
+                              256,
+                              160,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           Text(
@@ -386,54 +391,110 @@ class ExplorarTab extends ConsumerWidget {
   }
 
   Widget _buildCtaSection() {
+    const textDarkWarm = Color(0xFF0F1B2D);
+    const textMutedWarm = Color(0xFF6B6357);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Container(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(28),
         decoration: BoxDecoration(
-          color: AppColors.textDark,
-          borderRadius: BorderRadius.circular(24),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0x14000000)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0F000000),
+              blurRadius: 24,
+              offset: Offset(0, 12),
+              spreadRadius: -8,
+            ),
+            BoxShadow(
+              color: Color(0x08000000),
+              blurRadius: 2,
+              offset: Offset(0, 1),
+            ),
+          ],
         ),
         child: Column(
           children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.apartment_rounded,
+                size: 24,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 16),
             Text(
-              '¿Llevas la\nadministración?',
+              '¿Llevas la administración?',
               style: GoogleFonts.publicSans(
-                fontSize: 24,
+                fontSize: 22,
                 fontWeight: FontWeight.w700,
-                height: 32 / 24,
-                color: Colors.white,
+                height: 1.2,
+                letterSpacing: -0.4,
+                color: textDarkWarm,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                'Empieza a digitalizar tu comunidad\nhoy mismo con nuestras\nherramientas avanzadas.',
-                style: GoogleFonts.publicSans(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w400,
-                  height: 24 / 16,
-                  color: const Color(0xFF94A3B8),
-                ),
-                textAlign: TextAlign.center,
+            const SizedBox(height: 10),
+            Text(
+              'Empieza a digitalizar tu comunidad hoy mismo con nuestras herramientas avanzadas.',
+              style: GoogleFonts.publicSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                height: 1.5,
+                color: textMutedWarm,
               ),
+              textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 20),
             GestureDetector(
               onTap: () {
-                final url = Uri.parse('https://wa.me/573123969747?text=${Uri.encodeComponent('Hola, quiero registrar mi conjunto en Residence App')}');
+                final url = Uri.parse(
+                    'https://wa.me/573123969747?text=${Uri.encodeComponent('Hola, quiero registrar mi conjunto en Residence App')}');
                 launchUrl(url, mode: LaunchMode.externalApplication);
               },
-              child: Text(
-                'Registra tu conjunto aquí →',
-                style: GoogleFonts.publicSans(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  height: 24 / 16,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 18, vertical: 12),
+                decoration: BoxDecoration(
                   color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.25),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                      spreadRadius: -4,
+                    ),
+                  ],
                 ),
-                textAlign: TextAlign.center,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Registra tu conjunto',
+                      style: GoogleFonts.publicSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.1,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 16,
+                      color: Colors.white,
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -442,22 +503,42 @@ class ExplorarTab extends ConsumerWidget {
     );
   }
 
-  Widget _buildCondoImage(dynamic imagePath, double width, double height) {
-    if (imagePath != null && imagePath.toString().startsWith('assets/')) {
-      return Image.asset(imagePath as String, width: width, height: height, fit: BoxFit.cover);
-    }
-    return Container(
+  Widget _buildCondoImage(
+      dynamic imagePath, String? logoUrl, double width, double height) {
+    final placeholder = Container(
       width: width,
       height: height,
       color: const Color(0xFFE2E8F0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.apartment_rounded, size: 40, color: AppColors.primary.withValues(alpha: 0.6)),
+          Icon(Icons.apartment_rounded,
+              size: 40, color: AppColors.primary.withValues(alpha: 0.6)),
           const SizedBox(height: 4),
-          Text('Residence', style: GoogleFonts.publicSans(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary.withValues(alpha: 0.6))),
+          Text('Residence',
+              style: GoogleFonts.publicSans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary.withValues(alpha: 0.6))),
         ],
       ),
     );
+
+    if (logoUrl != null && logoUrl.isNotEmpty) {
+      return Image.network(
+        logoUrl,
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, progress) =>
+            progress == null ? child : placeholder,
+        errorBuilder: (_, __, ___) => placeholder,
+      );
+    }
+    if (imagePath != null && imagePath.toString().startsWith('assets/')) {
+      return Image.asset(imagePath as String,
+          width: width, height: height, fit: BoxFit.cover);
+    }
+    return placeholder;
   }
 }
